@@ -463,9 +463,13 @@ function PronosTab({ allMatches, myPreds, myJoker, jokerIsLocked, officialScores
   const openCount = allMatches.filter(m=>!isLocked(m.kickoff)).length;
   const totalPreds = Object.keys(myPreds).length;
 
+  // Masquer les matchs terminés (score officiel saisi)
+  const pendingMatches = allMatches.filter(m=>!officialScores[m.id]);
+  const finishedCount  = allMatches.length - pendingMatches.length;
+
   // Grouper : phase de groupes par groupe+journée, phases finales par phase
-  const groupMatches = allMatches.filter(m=>m.group);
-  const extraMatches = allMatches.filter(m=>!m.group);
+  const groupMatches = pendingMatches.filter(m=>m.group);
+  const extraMatches = pendingMatches.filter(m=>!m.group);
 
   const byGroup = groupMatches.reduce((acc,m)=>{
     (acc[m.group]=acc[m.group]||[]).push(m); return acc;
@@ -476,6 +480,7 @@ function PronosTab({ allMatches, myPreds, myJoker, jokerIsLocked, officialScores
       <div className="stats-row">
         <div className="stat-box"><div className="stat-num">{totalPreds}</div><div className="stat-lbl">Pronos</div></div>
         <div className="stat-box"><div className="stat-num">{openCount}</div><div className="stat-lbl">Ouverts</div></div>
+        <div className="stat-box"><div className="stat-num">{finishedCount}</div><div className="stat-lbl">Terminés</div></div>
         <div className="stat-box"><div className="stat-num">{players.length}</div><div className="stat-lbl">Joueurs</div></div>
       </div>
 
@@ -493,6 +498,7 @@ function PronosTab({ allMatches, myPreds, myJoker, jokerIsLocked, officialScores
 
       {/* Phase de groupes */}
       {Object.entries(byGroup).sort(([a],[b])=>a.localeCompare(b)).map(([group,matches])=>{
+        if (!matches.length) return null; // groupe entièrement terminé, on masque
         const byDay = matches.reduce((acc,m)=>{ (acc[m.day||1]=acc[m.day||1]||[]).push(m); return acc; },{});
         return (
           <div key={group} style={{marginBottom:24}}>
@@ -511,6 +517,14 @@ function PronosTab({ allMatches, myPreds, myJoker, jokerIsLocked, officialScores
           </div>
         );
       })}
+
+      {/* Message si tous les matchs sont terminés */}
+      {groupMatches.length===0&&extraMatches.length===0&&(
+        <div className="empty">
+          <div className="empty-icon">✅</div>
+          <div className="empty-txt">Tous les matchs sont terminés !<br/>Consultez le classement.</div>
+        </div>
+      )}
 
       {/* Phases finales (matchs ajoutés par l'admin) */}
       {extraMatches.length>0&&(
@@ -534,7 +548,7 @@ function PronosTab({ allMatches, myPreds, myJoker, jokerIsLocked, officialScores
 // ═══════════════════════════════════════════════════════════════
 //  CompareTab
 // ═══════════════════════════════════════════════════════════════
-function CompareTab({ players, allPreds, allJokers, allWinnerPreds, allMatches, username, settings }) {
+function CompareTab({ players, allPreds, allJokers, allWinnerPreds, allMatches, officialScores, username, settings }) {
   const showAll = settings.showAllPreds!==false;
   const cols = showAll ? players : players.filter(p=>p===username);
   if (!players.length) return (
@@ -560,9 +574,22 @@ function CompareTab({ players, allPreds, allJokers, allWinnerPreds, allMatches, 
           <tbody>
             {allMatches.sort((a,b)=>new Date(a.kickoff)-new Date(b.kickoff)).map(match=>{
               const open=!isLocked(match.kickoff);
+              const official=officialScores[match.id];
               return (
                 <tr key={match.id}>
-                  <td className="mc">{match.home} – {match.away}{open&&<span className="open-dot"/>}</td>
+                  <td className="mc">
+                    {match.home} – {match.away}
+                    {open&&!official&&<span className="open-dot"/>}
+                    {official&&(
+                      <span style={{
+                        display:"inline-block", marginLeft:6,
+                        fontFamily:"'Bebas Neue',sans-serif", fontSize:13,
+                        color:"#F5C842", letterSpacing:1,
+                        background:"rgba(245,200,66,.1)", borderRadius:4,
+                        padding:"0 5px"
+                      }}>{official.home}–{official.away}</span>
+                    )}
+                  </td>
                   {cols.map(p=>{
                     const pred=allPreds[fKey(p)]?.[match.id];
                     const isJ=allJokers[fKey(p)]===match.id;
@@ -1131,7 +1158,7 @@ export default function App() {
           {activeTab==="compare"&&(
             <CompareTab players={players} allPreds={allPreds} allJokers={allJokers}
               allWinnerPreds={allWinnerPreds} allMatches={allMatches}
-              username={username} settings={settings}
+              officialScores={officialScores} username={username} settings={settings}
             />
           )}
           {activeTab==="classement"&&(
