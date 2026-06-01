@@ -319,6 +319,10 @@ body{font-family:'Outfit',sans-serif;background:#080D1A;color:#E2E8FF;min-height
 .extra-match-date{font-size:10px;color:#2C3E5A;}
 .btn-del{background:transparent;border:1px solid rgba(239,68,68,.2);border-radius:6px;color:#F87171;font-size:11px;padding:2px 8px;cursor:pointer;flex-shrink:0;transition:all .2s;}
 .btn-del:hover{background:rgba(239,68,68,.1);}
+.btn-hide{background:transparent;border:1px solid #1B2A47;border-radius:6px;color:#4E5E84;font-size:11px;padding:2px 8px;cursor:pointer;flex-shrink:0;transition:all .2s;white-space:nowrap;}
+.btn-hide:hover{border-color:#2C3E5A;color:#8A9AC0;}
+.btn-hide.hidden{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.25);color:#F87171;}
+.btn-hide.hidden:hover{background:rgba(239,68,68,.16);}
 .paid-toggle-btn{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;cursor:pointer;border:1px solid;transition:all .2s;}
 .paid-toggle-btn.yes{background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.25);color:#4ADE80;}
 .paid-toggle-btn.no{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.2);color:#F87171;}
@@ -457,19 +461,18 @@ function MatchCard({ match, pred, onSave, myJoker, jokerIsLocked, onJokerToggle,
 // ═══════════════════════════════════════════════════════════════
 //  PronTab
 // ═══════════════════════════════════════════════════════════════
-function PronosTab({ allMatches, myPreds, myJoker, jokerIsLocked, officialScores, players, settings, onSave, onJoker }) {
+function PronosTab({ allMatches, myPreds, myJoker, jokerIsLocked, officialScores, players, settings, onSave, onJoker, hiddenMatches }) {
   const pts = { ...DEFAULT_POINTS, ...(settings.points||{}) };
   const jokerMatch = myJoker ? allMatches.find(m=>m.id===myJoker) : null;
-  const openCount = allMatches.filter(m=>!isLocked(m.kickoff)).length;
-  const totalPreds = Object.keys(myPreds).length;
 
-  // Masquer les matchs terminés (score officiel saisi)
-  const pendingMatches = allMatches.filter(m=>!officialScores[m.id]);
-  const finishedCount  = allMatches.length - pendingMatches.length;
+  // Filtrer les matchs masqués par l'admin
+  const visibleMatches = allMatches.filter(m=>!(hiddenMatches||{})[m.id]);
+  const openCount      = visibleMatches.filter(m=>!isLocked(m.kickoff)).length;
+  const finishedCount  = visibleMatches.filter(m=>isLocked(m.kickoff)).length;
+  const totalPreds     = Object.keys(myPreds).length;
 
-  // Grouper : phase de groupes par groupe+journée, phases finales par phase
-  const groupMatches = pendingMatches.filter(m=>m.group);
-  const extraMatches = pendingMatches.filter(m=>!m.group);
+  const groupMatches  = visibleMatches.filter(m=>m.group);
+  const extraMatches  = visibleMatches.filter(m=>!m.group);
 
   const byGroup = groupMatches.reduce((acc,m)=>{
     (acc[m.group]=acc[m.group]||[]).push(m); return acc;
@@ -498,7 +501,6 @@ function PronosTab({ allMatches, myPreds, myJoker, jokerIsLocked, officialScores
 
       {/* Phase de groupes */}
       {Object.entries(byGroup).sort(([a],[b])=>a.localeCompare(b)).map(([group,matches])=>{
-        if (!matches.length) return null; // groupe entièrement terminé, on masque
         const byDay = matches.reduce((acc,m)=>{ (acc[m.day||1]=acc[m.day||1]||[]).push(m); return acc; },{});
         return (
           <div key={group} style={{marginBottom:24}}>
@@ -517,14 +519,6 @@ function PronosTab({ allMatches, myPreds, myJoker, jokerIsLocked, officialScores
           </div>
         );
       })}
-
-      {/* Message si tous les matchs sont terminés */}
-      {groupMatches.length===0&&extraMatches.length===0&&(
-        <div className="empty">
-          <div className="empty-icon">✅</div>
-          <div className="empty-txt">Tous les matchs sont terminés !<br/>Consultez le classement.</div>
-        </div>
-      )}
 
       {/* Phases finales (matchs ajoutés par l'admin) */}
       {extraMatches.length>0&&(
@@ -711,7 +705,7 @@ function CagnotteTab({ players, cagnotteSettings, paidPlayers, username }) {
 // ═══════════════════════════════════════════════════════════════
 function AdminPanel({ settings, officialScores, extraMatches, players, paidPlayers, onClose,
   onToggleShowPreds, onSetTournamentWinner, onSaveScore, onSavePoints,
-  onAddMatch, onDeleteMatch, onSaveCagnotte, onTogglePaid }) {
+  onAddMatch, onDeleteMatch, onSaveCagnotte, onTogglePaid, onToggleHideMatch }) {
 
   const [localScores, setLocalScores] = useState({});
   const [savedIds,    setSavedIds]    = useState({});
@@ -819,9 +813,16 @@ function AdminPanel({ settings, officialScores, extraMatches, players, paidPlaye
               <div style={{fontSize:11,fontWeight:700,color:"#F5C842",letterSpacing:2,marginBottom:4,fontFamily:"'Bebas Neue',sans-serif"}}>Groupe {group}</div>
               {matches.map(m=>{
                 const s=localScores[m.id]||{home:"",away:""};
+                const hidden=(settings.hiddenMatches||{})[m.id];
                 return (
                   <div key={m.id} className="admin-match-row">
-                    <span className="admin-match-name">{m.home} – {m.away} <span style={{color:"#2C3E5A",fontSize:9}}>J{m.day}</span></span>
+                    <span className="admin-match-name" style={hidden?{color:"#2C3E5A",textDecoration:"line-through"}:{}}>
+                      {m.home} – {m.away} <span style={{color:"#2C3E5A",fontSize:9}}>J{m.day}</span>
+                    </span>
+                    <button className={`btn-hide${hidden?" hidden":""}`}
+                      onClick={()=>onToggleHideMatch(m.id,!hidden)}
+                      title={hidden?"Afficher dans les pronos":"Masquer des pronos"}
+                    >{hidden?"🚫 Masqué":"👁"}</button>
                     <input type="number" min="0" max="30" placeholder="–"
                       className={`adm-in${s.home!==""?" has-val":""}`} value={s.home}
                       onChange={e=>setLocalScores(p=>({...p,[m.id]:{...p[m.id],home:e.target.value}}))}
@@ -861,12 +862,17 @@ function AdminPanel({ settings, officialScores, extraMatches, players, paidPlaye
           {extraMatches.length>0&&(
             <div style={{marginTop:12}}>
               <div style={{fontSize:10,color:"#4E5E84",fontWeight:700,textTransform:"uppercase",letterSpacing:.7,marginBottom:6}}>Matchs ajoutés</div>
-              {extraMatches.sort((a,b)=>new Date(a.kickoff)-new Date(b.kickoff)).map(m=>(
+              {extraMatches.sort((a,b)=>new Date(a.kickoff)-new Date(b.kickoff)).map(m=>{
+                const hidden=(settings.hiddenMatches||{})[m.id];
+                return (
                 <div key={m.id} className="extra-match-row">
                   <div className="extra-match-info">
-                    <div className="extra-match-name">{m.home} – {m.away}</div>
+                    <div className="extra-match-name" style={hidden?{color:"#2C3E5A",textDecoration:"line-through"}:{}}>{m.home} – {m.away}</div>
                     <div className="extra-match-date">{m.phase&&m.phase+" · "}{fmtDate(m.kickoff)}</div>
                   </div>
+                  <button className={`btn-hide${hidden?" hidden":""}`}
+                    onClick={()=>onToggleHideMatch(m.id,!hidden)}
+                  >{hidden?"🚫":"👁"}</button>
                   {/* Score */}
                   {(()=>{
                     const s=localScores[m.id]||{home:"",away:""};
@@ -887,7 +893,7 @@ function AdminPanel({ settings, officialScores, extraMatches, players, paidPlaye
                   })()}
                   <button className="btn-del" onClick={()=>onDeleteMatch(m.id)}>✕</button>
                 </div>
-              ))}
+              );})}
             </div>
           )}
         </div>
@@ -1046,6 +1052,10 @@ export default function App() {
     await update(ref(db,`${APP}/settings`),{cagnotte:cfg});
   }
 
+  async function toggleHideMatch(matchId, hide) {
+    await set(ref(db,`${APP}/settings/hiddenMatches/${matchId}`), hide||null);
+  }
+
   async function togglePaid(player,paid) {
     await set(ref(db,`${APP}/cagnotte/paid/${fKey(player)}`),paid||null);
   }
@@ -1115,6 +1125,7 @@ export default function App() {
             onSavePoints={pts=>saveSettings({points:pts})}
             onAddMatch={addExtraMatch} onDeleteMatch={deleteExtraMatch}
             onSaveCagnotte={saveCagnotte} onTogglePaid={togglePaid}
+            onToggleHideMatch={toggleHideMatch}
           />
         )}
 
@@ -1153,6 +1164,7 @@ export default function App() {
             <PronosTab allMatches={allMatches} myPreds={myPreds} myJoker={myJoker}
               jokerIsLocked={jokerIsLocked} officialScores={officialScores}
               players={players} settings={settings} onSave={savePred} onJoker={saveJoker}
+              hiddenMatches={settings.hiddenMatches||{}}
             />
           )}
           {activeTab==="compare"&&(
