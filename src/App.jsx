@@ -704,7 +704,7 @@ function CagnotteTab({ players, cagnotteSettings, paidPlayers, username }) {
 //  AdminPanel
 // ═══════════════════════════════════════════════════════════════
 function AdminPanel({ settings, officialScores, extraMatches, players, paidPlayers, onClose,
-  onToggleShowPreds, onSetTournamentWinner, onSaveScore, onSavePoints,
+  onToggleShowPreds, onSetTournamentWinner, onSaveScore, onDeleteScore, onSavePoints,
   onAddMatch, onDeleteMatch, onSaveCagnotte, onTogglePaid, onToggleHideMatch }) {
 
   const [localScores, setLocalScores] = useState({});
@@ -735,7 +735,15 @@ function AdminPanel({ settings, officialScores, extraMatches, players, paidPlaye
 
   const handleScoreBlur=async(matchId)=>{
     const s=localScores[matchId];
-    if(!s||s.home===""||s.away==="") return;
+    if(!s) return;
+    // Si les deux champs sont vides → supprimer le score
+    if(s.home===""&&s.away==="") {
+      await onDeleteScore(matchId);
+      setSavedIds(p=>({...p,[matchId]:true}));
+      setTimeout(()=>setSavedIds(p=>{const n={...p};delete n[matchId];return n;}),2000);
+      return;
+    }
+    if(s.home===""||s.away==="") return; // un seul champ rempli, on attend
     const h=parseInt(s.home),a=parseInt(s.away);
     if(isNaN(h)||isNaN(a)) return;
     await onSaveScore(matchId,h,a);
@@ -1033,6 +1041,10 @@ export default function App() {
     await update(ref(db,`${APP}/officialScores`),{[matchId]:{home,away}});
   }
 
+  async function deleteOfficialScore(matchId) {
+    await remove(ref(db,`${APP}/officialScores/${matchId}`));
+  }
+
   async function saveSettings(changes) {
     await update(ref(db,`${APP}/settings`),changes);
   }
@@ -1122,6 +1134,7 @@ export default function App() {
             onToggleShowPreds={v=>saveSettings({showAllPreds:v})}
             onSetTournamentWinner={v=>saveSettings({tournamentWinner:v})}
             onSaveScore={saveOfficialScore}
+            onDeleteScore={deleteOfficialScore}
             onSavePoints={pts=>saveSettings({points:pts})}
             onAddMatch={addExtraMatch} onDeleteMatch={deleteExtraMatch}
             onSaveCagnotte={saveCagnotte} onTogglePaid={togglePaid}
@@ -1132,7 +1145,10 @@ export default function App() {
         {/* HEADER */}
         <div className="header">
           <div className="header-row">
-            <div className="logo">⚽ Pronos <em>CM 2026</em></div>
+            <div className="logo">
+              ⚽ Pronos <em>CdM 2026</em>
+              <span style={{display:"block",fontSize:"10px",fontFamily:"'Outfit',sans-serif",fontWeight:500,color:"rgba(255,255,255,.35)",letterSpacing:"1px",marginTop:"-2px"}}>par Maxime Lamy</span>
+            </div>
             <div className="header-btns">
               <button className={`admin-btn${isAdmin?" on":""}`} onClick={handleAdminClick}>
                 {isAdmin?"⚙️ Admin":"🔐"}
