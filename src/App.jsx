@@ -429,7 +429,11 @@ function MatchCard({ match, pred, onSave, myJoker, jokerIsLocked, onJokerToggle,
     <div className={`card${locked?" locked":""}`}>
       <div className="card-top">
         <span className="card-date">{fmtDate(match.kickoff)}</span>
-        {locked?<span className="badge badge-locked">🔒</span>:<span className="badge badge-open">● Ouvert</span>}
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          {match.group&&<span style={{fontSize:10,fontWeight:700,color:"#4E5E84",letterSpacing:.5}}>Gr. {match.group}</span>}
+          {match.phase&&!match.group&&<span style={{fontSize:10,fontWeight:700,color:"#907840",letterSpacing:.5}}>{match.phase}</span>}
+          {locked?<span className="badge badge-locked">🔒</span>:<span className="badge badge-open">● Ouvert</span>}
+        </div>
       </div>
       <div className="card-teams">
         <div className="team-block"><span className="team-label">{match.home}</span></div>
@@ -582,6 +586,26 @@ function PronosTab({ allMatches, myPreds, myJoker, jokerIsLocked, officialScores
 function CompareTab({ players, allPreds, allJokers, allWinnerPreds, allMatches, officialScores, username, settings }) {
   const showAll = settings.showAllPreds!==false;
   const cols = showAll ? players : players.filter(p=>p===username);
+
+  // Filtres groupe/phase
+  const groups = [...new Set(allMatches.filter(m=>m.group).map(m=>m.group))].sort();
+  const phases = [...new Set(allMatches.filter(m=>!m.group&&m.phase).map(m=>m.phase))];
+  const filterOptions = [
+    {key:"tous", label:"Tous"},
+    ...groups.map(g=>({key:`G:${g}`, label:`Groupe ${g}`})),
+    ...phases.map(p=>({key:`P:${p}`, label:p})),
+  ];
+  const [filter, setFilter] = useState("tous");
+
+  const filteredMatches = allMatches
+    .filter(m => {
+      if (filter==="tous") return true;
+      if (filter.startsWith("G:")) return m.group===filter.slice(2);
+      if (filter.startsWith("P:")) return m.phase===filter.slice(2);
+      return true;
+    })
+    .sort((a,b)=>new Date(a.kickoff)-new Date(b.kickoff));
+
   if (!players.length) return (
     <div className="empty"><div className="empty-icon">👥</div>
     <div className="empty-txt">Personne d'autre n'a encore rejoint.</div></div>
@@ -596,6 +620,17 @@ function CompareTab({ players, allPreds, allJokers, allWinnerPreds, allMatches, 
         {players.map(p=><span key={p} className={`p-chip${p===username?" me":""}`}>{p===username?"👤 ":""}{p}</span>)}
       </div>
       {!showAll&&<div className="hidden-notice">🔒 L'admin a masqué les pronos des autres</div>}
+
+      {/* Filtre par groupe */}
+      <div className="phase-tabs-wrap" style={{marginBottom:12}}>
+        {filterOptions.map(o=>(
+          <button key={o.key}
+            className={`phase-tab${filter===o.key?" active":""}`}
+            onClick={()=>setFilter(o.key)}
+          >{o.label}</button>
+        ))}
+      </div>
+
       <div className="scroll-wrap">
         <table className="cmp-table">
           <thead><tr>
@@ -603,21 +638,21 @@ function CompareTab({ players, allPreds, allJokers, allWinnerPreds, allMatches, 
             {cols.map(p=><th key={p}>{p===username?"👤 ":""}{p}</th>)}
           </tr></thead>
           <tbody>
-            {allMatches.sort((a,b)=>new Date(a.kickoff)-new Date(b.kickoff)).map(match=>{
+            {filteredMatches.map(match=>{
               const open=!isLocked(match.kickoff);
               const official=officialScores[match.id];
               return (
                 <tr key={match.id}>
                   <td className="mc">
+                    {match.group&&<span style={{fontSize:9,color:"#3D5070",marginRight:4,fontWeight:700}}>Gr.{match.group}</span>}
                     {match.home} – {match.away}
                     {open&&!official&&<span className="open-dot"/>}
                     {official&&(
                       <span style={{
-                        display:"inline-block", marginLeft:6,
-                        fontFamily:"'Bebas Neue',sans-serif", fontSize:13,
-                        color:"#F5C842", letterSpacing:1,
-                        background:"rgba(245,200,66,.1)", borderRadius:4,
-                        padding:"0 5px"
+                        display:"inline-block",marginLeft:6,
+                        fontFamily:"'Bebas Neue',sans-serif",fontSize:13,
+                        color:"#F5C842",letterSpacing:1,
+                        background:"rgba(245,200,66,.1)",borderRadius:4,padding:"0 5px"
                       }}>{official.home}–{official.away}</span>
                     )}
                   </td>
