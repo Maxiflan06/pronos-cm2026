@@ -208,7 +208,13 @@ body{font-family:'Outfit',sans-serif;background:#080D1A;color:#E2E8FF;min-height
 .joker-btn.active{border-color:#F5C842;color:#F5C842;background:rgba(245,200,66,.12);}
 .joker-btn:disabled{opacity:.3;cursor:not-allowed;}
 
-/* INFO BANNERS */
+/* PHASE TABS */
+.phase-tabs-wrap{display:flex;gap:6px;overflow-x:auto;margin-bottom:16px;padding-bottom:2px;-ms-overflow-style:none;scrollbar-width:none;}
+.phase-tabs-wrap::-webkit-scrollbar{display:none;}
+.phase-tab{flex-shrink:0;background:#0F182C;border:1px solid #1B2A47;border-radius:20px;color:#4E5E84;font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;padding:6px 14px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:5px;white-space:nowrap;}
+.phase-tab:hover{border-color:#2C3E5A;color:#8A9AC0;}
+.phase-tab.active{background:rgba(245,200,66,.12);border-color:rgba(245,200,66,.5);color:#F5C842;}
+.phase-tab-dot{width:5px;height:5px;border-radius:50%;background:#4ADE80;flex-shrink:0;}
 .info-bar{background:rgba(245,200,66,.06);border:1px solid rgba(245,200,66,.2);border-radius:10px;padding:8px 12px;margin-bottom:14px;font-size:12px;color:#907840;line-height:1.5;}
 .info-bar strong{color:#F5C842;}
 
@@ -459,27 +465,58 @@ function MatchCard({ match, pred, onSave, myJoker, jokerIsLocked, onJokerToggle,
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  PronTab
+//  PronosTab
 // ═══════════════════════════════════════════════════════════════
 function PronosTab({ allMatches, myPreds, myJoker, jokerIsLocked, officialScores, players, settings, onSave, onJoker, hiddenMatches }) {
   const pts = { ...DEFAULT_POINTS, ...(settings.points||{}) };
   const jokerMatch = myJoker ? allMatches.find(m=>m.id===myJoker) : null;
 
-  // Filtrer les matchs masqués par l'admin
+  // Matchs visibles (non masqués par l'admin)
   const visibleMatches = allMatches.filter(m=>!(hiddenMatches||{})[m.id]);
+  const totalPreds     = Object.keys(myPreds).length;
   const openCount      = visibleMatches.filter(m=>!isLocked(m.kickoff)).length;
   const finishedCount  = visibleMatches.filter(m=>isLocked(m.kickoff)).length;
-  const totalPreds     = Object.keys(myPreds).length;
 
-  const groupMatches  = visibleMatches.filter(m=>m.group);
-  const extraMatches  = visibleMatches.filter(m=>!m.group);
+  // Construction des onglets dynamiques
+  // - Journées 1, 2, 3 (matchs de groupe)
+  // - Phases finales : une par valeur unique de `phase` dans extraMatches
+  const extraPhases = [...new Set(
+    visibleMatches.filter(m=>!m.group&&m.phase).map(m=>m.phase)
+  )];
+  // On trie les phases finales dans l'ordre chronologique du premier match de chaque phase
+  extraPhases.sort((a,b)=>{
+    const firstA = visibleMatches.filter(m=>m.phase===a).sort((x,y)=>new Date(x.kickoff)-new Date(y.kickoff))[0];
+    const firstB = visibleMatches.filter(m=>m.phase===b).sort((x,y)=>new Date(x.kickoff)-new Date(y.kickoff))[0];
+    return new Date(firstA?.kickoff||0)-new Date(firstB?.kickoff||0);
+  });
 
-  const byGroup = groupMatches.reduce((acc,m)=>{
-    (acc[m.group]=acc[m.group]||[]).push(m); return acc;
-  },{});
+  const hasDayMatches = d => visibleMatches.some(m=>m.group&&m.day===d);
+  const phaseTabs = [
+    ...[1,2,3].filter(hasDayMatches).map(d=>({ key:`J${d}`, label:`Journée ${d}` })),
+    ...extraPhases.map(p=>({ key:`P:${p}`, label:p })),
+  ];
+
+  // Onglet actif : par défaut le premier onglet avec au moins un match ouvert, sinon le premier
+  const defaultTab = phaseTabs.find(t=>{
+    const ms = t.key.startsWith("J")
+      ? visibleMatches.filter(m=>m.group&&m.day===Number(t.key[1]))
+      : visibleMatches.filter(m=>m.phase===t.key.slice(2));
+    return ms.some(m=>!isLocked(m.kickoff));
+  }) || phaseTabs[0];
+
+  const [activePhase, setActivePhase] = useState(defaultTab?.key||"J1");
+
+  // Matchs de l'onglet actif, triés chronologiquement
+  const tabMatches = visibleMatches
+    .filter(m => activePhase.startsWith("J")
+      ? m.group && m.day===Number(activePhase[1])
+      : !m.group && m.phase===activePhase.slice(2)
+    )
+    .sort((a,b)=>new Date(a.kickoff)-new Date(b.kickoff));
 
   return (
     <>
+      {/* Stats */}
       <div className="stats-row">
         <div className="stat-box"><div className="stat-num">{totalPreds}</div><div className="stat-lbl">Pronos</div></div>
         <div className="stat-box"><div className="stat-num">{openCount}</div><div className="stat-lbl">Ouverts</div></div>
@@ -487,6 +524,7 @@ function PronosTab({ allMatches, myPreds, myJoker, jokerIsLocked, officialScores
         <div className="stat-box"><div className="stat-num">{players.length}</div><div className="stat-lbl">Joueurs</div></div>
       </div>
 
+      {/* Joker banner */}
       {!myJoker&&(
         <div className="info-bar">
           🃏 <strong>Joker disponible</strong> — multipliez vos points par <strong>{pts.joker}×</strong> sur un match !
@@ -499,41 +537,40 @@ function PronosTab({ allMatches, myPreds, myJoker, jokerIsLocked, officialScores
         </div>
       )}
 
-      {/* Phase de groupes */}
-      {Object.entries(byGroup).sort(([a],[b])=>a.localeCompare(b)).map(([group,matches])=>{
-        const byDay = matches.reduce((acc,m)=>{ (acc[m.day||1]=acc[m.day||1]||[]).push(m); return acc; },{});
-        return (
-          <div key={group} style={{marginBottom:24}}>
-            <div className="section-header">Groupe {group}</div>
-            {Object.entries(byDay).sort(([a],[b])=>Number(a)-Number(b)).map(([day,ms])=>(
-              <div key={day}>
-                <div className="day-label">Journée {day}</div>
-                {ms.map(match=>(
-                  <MatchCard key={match.id} match={match} pred={myPreds[match.id]}
-                    onSave={onSave} myJoker={myJoker} jokerIsLocked={jokerIsLocked}
-                    onJokerToggle={onJoker} officialScore={officialScores[match.id]}
-                  />
-                ))}
-              </div>
-            ))}
-          </div>
-        );
-      })}
+      {/* Onglets de phase */}
+      {phaseTabs.length>0&&(
+        <div className="phase-tabs-wrap">
+          {phaseTabs.map(t=>{
+            const ms = t.key.startsWith("J")
+              ? visibleMatches.filter(m=>m.group&&m.day===Number(t.key[1]))
+              : visibleMatches.filter(m=>m.phase===t.key.slice(2));
+            const hasOpen = ms.some(m=>!isLocked(m.kickoff));
+            return (
+              <button key={t.key}
+                className={`phase-tab${activePhase===t.key?" active":""}${hasOpen?" has-open":""}`}
+                onClick={()=>setActivePhase(t.key)}
+              >
+                {t.label}
+                {hasOpen&&<span className="phase-tab-dot"/>}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
-      {/* Phases finales (matchs ajoutés par l'admin) */}
-      {extraMatches.length>0&&(
-        <>
-          <div className="section-header" style={{marginTop:8}}>Phase finale</div>
-          {extraMatches.sort((a,b)=>new Date(a.kickoff)-new Date(b.kickoff)).map(match=>(
-            <div key={match.id}>
-              {match.phase&&<div className="day-label">{match.phase}</div>}
-              <MatchCard match={match} pred={myPreds[match.id]}
-                onSave={onSave} myJoker={myJoker} jokerIsLocked={jokerIsLocked}
-                onJokerToggle={onJoker} officialScore={officialScores[match.id]}
-              />
-            </div>
-          ))}
-        </>
+      {/* Matchs de l'onglet actif */}
+      {tabMatches.length===0?(
+        <div className="empty">
+          <div className="empty-icon">📭</div>
+          <div className="empty-txt">Aucun match disponible dans cette phase.</div>
+        </div>
+      ):(
+        tabMatches.map(match=>(
+          <MatchCard key={match.id} match={match} pred={myPreds[match.id]}
+            onSave={onSave} myJoker={myJoker} jokerIsLocked={jokerIsLocked}
+            onJokerToggle={onJoker} officialScore={officialScores[match.id]}
+          />
+        ))
       )}
     </>
   );
