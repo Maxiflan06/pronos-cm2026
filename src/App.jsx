@@ -106,6 +106,15 @@ const BASE_MATCHES = [
 ];
 
 const DEFAULT_POINTS = { exact: 3, result: 1, joker: 2, winnerBonus: 15 };
+
+const DEFAULT_POINTS_2 = {
+  winner:      3,  // bon vainqueur ou nul
+  exactHome:   1,  // buts exacts équipe domicile
+  exactAway:   1,  // buts exacts équipe extérieur
+  exactDiff:   1,  // différence de buts exacte
+  joker:       2,  // multiplicateur joker
+  winnerBonus: 15, // bonus vainqueur CdM
+};
 const APP = "wc26";
 const fKey = s => s.replace(/[.#$[\]/]/g,"_");
 const pPath = u => `${APP}/preds/${fKey(u)}`;
@@ -124,9 +133,17 @@ const fmtDate  = iso => {
     +" · "+d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit",timeZone:"Europe/Paris"});
 };
 const norm = s => (s||"").replace(/^\S+\s*/,"").toLowerCase().trim();
+// Compatibilité ascendante : ancien format = string, nouveau = {matchId: true}
+const normalizeJokers = val => {
+  if (!val) return [];
+  if (typeof val === 'string') return [val];
+  if (typeof val === 'object') return Object.keys(val);
+  return [];
+};
 
-function calcPoints(preds, scores, jokerMatchId, winnerPred, tournamentWinner, pts) {
+function calcPoints(preds, scores, jokerMatchIds, winnerPred, tournamentWinner, pts) {
   const P = { ...DEFAULT_POINTS, ...(pts||{}) };
+  const jIds = normalizeJokers(jokerMatchIds);
   let total=0, exact=0, result=0, jokerBonus=0;
   for (const [id, pred] of Object.entries(preds||{})) {
     const s = scores?.[id];
@@ -134,12 +151,32 @@ function calcPoints(preds, scores, jokerMatchId, winnerPred, tournamentWinner, p
     let p=0;
     if (pred.home===s.home&&pred.away===s.away) { p=P.exact; exact++; }
     else if (Math.sign(pred.home-pred.away)===Math.sign(s.home-s.away)) { p=P.result; result++; }
-    if (jokerMatchId===id) { jokerBonus=p; p=Math.round(p*P.joker); }
+    if (jIds.includes(id)) { jokerBonus+=p; p=Math.round(p*P.joker); }
     total+=p;
   }
   const winnerOK = tournamentWinner&&winnerPred&&norm(winnerPred)===norm(tournamentWinner);
   if (winnerOK) total+=P.winnerBonus;
   return { total, exact, result, jokerBonus, winnerOK };
+}
+
+function calcPoints2(preds, scores, jokerMatchIds, winnerPred, tournamentWinner, pts2) {
+  const P = { ...DEFAULT_POINTS_2, ...(pts2||{}) };
+  const jIds = normalizeJokers(jokerMatchIds);
+  let total=0, winnerCount=0, homeCount=0, awayCount=0, diffCount=0, jokerBonus=0;
+  for (const [id, pred] of Object.entries(preds||{})) {
+    const s = scores?.[id];
+    if (!s||pred.home==null||pred.away==null) continue;
+    let p=0;
+    if (Math.sign(pred.home-pred.away)===Math.sign(s.home-s.away)) { p+=P.winner; winnerCount++; }
+    if (pred.home===s.home) { p+=P.exactHome; homeCount++; }
+    if (pred.away===s.away) { p+=P.exactAway; awayCount++; }
+    if ((pred.home-pred.away)===(s.home-s.away)) { p+=P.exactDiff; diffCount++; }
+    if (jIds.includes(id)) { jokerBonus+=p; p=Math.round(p*P.joker); }
+    total+=p;
+  }
+  const winnerOK = tournamentWinner&&winnerPred&&norm(winnerPred)===norm(tournamentWinner);
+  if (winnerOK) total+=P.winnerBonus;
+  return { total, winnerCount, homeCount, awayCount, diffCount, jokerBonus, winnerOK };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -414,7 +451,7 @@ function WinnerModal({ onSubmit }) {
 // ═══════════════════════════════════════════════════════════════
 //  MatchCard
 // ═══════════════════════════════════════════════════════════════
-function MatchCard({ match, pred, onSave, myJoker, jokerIsLocked, onJokerToggle, officialScore }) {
+function MatchCard({ match, pred, onSave, myJokers, jokerCount, onJokerToggle, officialScore }) {
   const locked = isLocked(match.kickoff);
   const [h, setH] = useState(pred?.home!=null?String(pred.home):"");
   const [a, setA] = useState(pred?.away!=null?String(pred.away):"");
@@ -423,8 +460,14 @@ function MatchCard({ match, pred, onSave, myJoker, jokerIsLocked, onJokerToggle,
     setA(pred?.away!=null?String(pred.away):"");
   },[pred?.home,pred?.away]);
   const trySave=(lh,la)=>{ if(lh!==""&&la!==""&&!locked) onSave(match.id,Number(lh),Number(la)); };
-  const isJ=myJoker===match.id;
-  const showJoker=isJ||(!locked&&!jokerIsLocked);
+
+  const jokers     = normalizeJokers(myJokers);
+  const isJ        = jokers.includes(match.id);
+  const canAdd     = !isJ && !locked && jokers.length < jokerCount;
+  const canRemove  = isJ && !locked;
+  const showJoker  = isJ || canAdd;
+  const multiplier = jokerCount > 0 ? (isJ ? "×?" : "") : "";
+
   return (
     <div className={`card${locked?" locked":""}`}>
       <div className="card-top">
@@ -457,10 +500,13 @@ function MatchCard({ match, pred, onSave, myJoker, jokerIsLocked, onJokerToggle,
       {showJoker&&(
         <div className="joker-row">
           <button className={`joker-btn${isJ?" active":""}`}
-            disabled={isJ&&locked}
-            onClick={()=>isJ&&!locked?onJokerToggle(null):(!locked&&!jokerIsLocked&&onJokerToggle(match.id))}
+            disabled={!canRemove && !canAdd}
+            onClick={()=>{
+              if (canRemove) onJokerToggle(jokers.filter(id=>id!==match.id));
+              else if (canAdd) onJokerToggle([...jokers, match.id]);
+            }}
           >
-            {isJ?"🃏 Joker actif — points ×"+("?"):"🃏 Placer mon joker ici"}
+            {isJ ? "🃏 Joker actif — points ×?" : `🃏 Placer un joker (${jokers.length}/${jokerCount} utilisé${jokers.length>1?"s":""})`}
           </button>
         </div>
       )}
@@ -471,23 +517,17 @@ function MatchCard({ match, pred, onSave, myJoker, jokerIsLocked, onJokerToggle,
 // ═══════════════════════════════════════════════════════════════
 //  PronosTab
 // ═══════════════════════════════════════════════════════════════
-function PronosTab({ allMatches, myPreds, myJoker, jokerIsLocked, officialScores, players, settings, onSave, onJoker, hiddenMatches }) {
-  const pts = { ...DEFAULT_POINTS, ...(settings.points||{}) };
-  const jokerMatch = myJoker ? allMatches.find(m=>m.id===myJoker) : null;
+function PronosTab({ allMatches, myPreds, myJokers, officialScores, players, settings, onSave, onJoker, hiddenMatches }) {
+  const pts       = { ...DEFAULT_POINTS, ...(settings.points||{}) };
+  const jokerCount = settings.jokerCount ?? 1;
+  const jokers    = normalizeJokers(myJokers);
 
-  // Matchs visibles (non masqués par l'admin)
   const visibleMatches = allMatches.filter(m=>!(hiddenMatches||{})[m.id]);
   const totalPreds     = Object.keys(myPreds).length;
   const openCount      = visibleMatches.filter(m=>!isLocked(m.kickoff)).length;
   const finishedCount  = visibleMatches.filter(m=>isLocked(m.kickoff)).length;
 
-  // Construction des onglets dynamiques
-  // - Journées 1, 2, 3 (matchs de groupe)
-  // - Phases finales : une par valeur unique de `phase` dans extraMatches
-  const extraPhases = [...new Set(
-    visibleMatches.filter(m=>!m.group&&m.phase).map(m=>m.phase)
-  )];
-  // On trie les phases finales dans l'ordre chronologique du premier match de chaque phase
+  const extraPhases = [...new Set(visibleMatches.filter(m=>!m.group&&m.phase).map(m=>m.phase))];
   extraPhases.sort((a,b)=>{
     const firstA = visibleMatches.filter(m=>m.phase===a).sort((x,y)=>new Date(x.kickoff)-new Date(y.kickoff))[0];
     const firstB = visibleMatches.filter(m=>m.phase===b).sort((x,y)=>new Date(x.kickoff)-new Date(y.kickoff))[0];
@@ -500,7 +540,6 @@ function PronosTab({ allMatches, myPreds, myJoker, jokerIsLocked, officialScores
     ...extraPhases.map(p=>({ key:`P:${p}`, label:p })),
   ];
 
-  // Onglet actif : par défaut le premier onglet avec au moins un match ouvert, sinon le premier
   const defaultTab = phaseTabs.find(t=>{
     const ms = t.key.startsWith("J")
       ? visibleMatches.filter(m=>m.group&&m.day===Number(t.key[1]))
@@ -510,7 +549,6 @@ function PronosTab({ allMatches, myPreds, myJoker, jokerIsLocked, officialScores
 
   const [activePhase, setActivePhase] = useState(defaultTab?.key||"J1");
 
-  // Matchs de l'onglet actif, triés chronologiquement
   const tabMatches = visibleMatches
     .filter(m => activePhase.startsWith("J")
       ? m.group && m.day===Number(activePhase[1])
@@ -518,9 +556,12 @@ function PronosTab({ allMatches, myPreds, myJoker, jokerIsLocked, officialScores
     )
     .sort((a,b)=>new Date(a.kickoff)-new Date(b.kickoff));
 
+  // Joker banner
+  const lockedJokers   = jokers.filter(id=>isLocked(allMatches.find(m=>m.id===id)?.kickoff??"9999"));
+  const remainingSlots = jokerCount - jokers.length;
+
   return (
     <>
-      {/* Stats */}
       <div className="stats-row">
         <div className="stat-box"><div className="stat-num">{totalPreds}</div><div className="stat-lbl">Pronos</div></div>
         <div className="stat-box"><div className="stat-num">{openCount}</div><div className="stat-lbl">Ouverts</div></div>
@@ -528,20 +569,12 @@ function PronosTab({ allMatches, myPreds, myJoker, jokerIsLocked, officialScores
         <div className="stat-box"><div className="stat-num">{players.length}</div><div className="stat-lbl">Joueurs</div></div>
       </div>
 
-      {/* Joker banner */}
-      {!myJoker&&(
-        <div className="info-bar">
-          🃏 <strong>Joker disponible</strong> — multipliez vos points par <strong>{pts.joker}×</strong> sur un match !
-        </div>
-      )}
-      {myJoker&&jokerMatch&&(
-        <div className="info-bar">
-          🃏 Joker sur <strong>{jokerMatch.home} – {jokerMatch.away}</strong>
-          {jokerIsLocked?" · 🔒 Verrouillé":" · Cliquez pour déplacer"}
-        </div>
+      {jokerCount>0&&(
+        remainingSlots>0
+          ? <div className="info-bar">🃏 <strong>{remainingSlots} joker{remainingSlots>1?"s":""} disponible{remainingSlots>1?"s":""}</strong> sur {jokerCount} — multipliez vos points par <strong>{pts.joker}×</strong> !</div>
+          : <div className="info-bar">🃏 Jokers placés : <strong>{jokers.length}/{jokerCount}</strong>{lockedJokers.length>0?` · ${lockedJokers.length} verrouillé${lockedJokers.length>1?"s":""}`:" · Cliquez pour déplacer"}</div>
       )}
 
-      {/* Onglets de phase */}
       {phaseTabs.length>0&&(
         <div className="phase-tabs-wrap">
           {phaseTabs.map(t=>{
@@ -562,16 +595,12 @@ function PronosTab({ allMatches, myPreds, myJoker, jokerIsLocked, officialScores
         </div>
       )}
 
-      {/* Matchs de l'onglet actif */}
       {tabMatches.length===0?(
-        <div className="empty">
-          <div className="empty-icon">📭</div>
-          <div className="empty-txt">Aucun match disponible dans cette phase.</div>
-        </div>
+        <div className="empty"><div className="empty-icon">📭</div><div className="empty-txt">Aucun match disponible dans cette phase.</div></div>
       ):(
         tabMatches.map(match=>(
           <MatchCard key={match.id} match={match} pred={myPreds[match.id]}
-            onSave={onSave} myJoker={myJoker} jokerIsLocked={jokerIsLocked}
+            onSave={onSave} myJokers={myJokers} jokerCount={jokerCount}
             onJokerToggle={onJoker} officialScore={officialScores[match.id]}
           />
         ))
@@ -658,7 +687,7 @@ function CompareTab({ players, allPreds, allJokers, allWinnerPreds, allMatches, 
                   </td>
                   {cols.map(p=>{
                     const pred=allPreds[fKey(p)]?.[match.id];
-                    const isJ=allJokers[fKey(p)]===match.id;
+                    const isJ=normalizeJokers(allJokers[fKey(p)]).includes(match.id);
                     return <td key={p}>{pred!=null
                       ?<span className={`pred-val${isJ?" joker-pred":""}`}>{isJ?"🃏 ":""}{pred.home}–{pred.away}</span>
                       :<span className="no-pred">—</span>}</td>;
@@ -680,25 +709,26 @@ function CompareTab({ players, allPreds, allJokers, allWinnerPreds, allMatches, 
 // ═══════════════════════════════════════════════════════════════
 //  ClassementTab
 // ═══════════════════════════════════════════════════════════════
-function ClassementTab({ players, allPreds, allJokers, allWinnerPreds, officialScores, settings }) {
-  const hasScores=Object.keys(officialScores||{}).length>0;
-  const tw=settings.tournamentWinner||"";
-  const pts={ ...DEFAULT_POINTS, ...(settings.points||{}) };
-  if (!hasScores) return (
-    <div className="no-scores"><div style={{fontSize:36,marginBottom:10}}>⏳</div>
-    <p style={{fontSize:13,color:"#3D5070",lineHeight:1.6}}>Le classement apparaîtra dès que<br/>l'admin aura saisi les premiers scores.</p></div>
-  );
-  const rankings=[...players].map(p=>{
-    const k=fKey(p);
-    const stats=calcPoints(allPreds[k]||{},officialScores,allJokers[k]||null,allWinnerPreds[k]||null,tw,pts);
-    const jMatch=allJokers[k]?null:null;
-    return {name:p,...stats,wPred:allWinnerPreds[k]||null};
+function RankingList({ players, allPreds, allJokers, allWinnerPreds, officialScores, tw, pts, pts2, system }) {
+  const P  = { ...DEFAULT_POINTS,   ...(pts||{}) };
+  const P2 = { ...DEFAULT_POINTS_2, ...(pts2||{}) };
+
+  const rankings = [...players].map(p => {
+    const k = fKey(p);
+    const preds  = allPreds[k]||{};
+    const jIds   = normalizeJokers(allJokers[k]);
+    const wPred  = allWinnerPreds[k]||null;
+    if (system===2) {
+      const s = calcPoints2(preds, officialScores, jIds, wPred, tw, P2);
+      return { name:p, wPred, ...s };
+    }
+    const s = calcPoints(preds, officialScores, jIds, wPred, tw, P);
+    return { name:p, wPred, ...s };
   }).sort((a,b)=>b.total-a.total);
 
   let rank=1;
   return (
     <>
-      {tw&&<div className="winner-banner">🏆 Vainqueur officiel : <strong>{tw}</strong><span style={{marginLeft:"auto",fontSize:11,color:"#4ADE80"}}>+{pts.winnerBonus} pts</span></div>}
       {rankings.map((r,i)=>{
         if(i>0&&r.total<rankings[i-1].total) rank=i+1;
         const medal=rank===1?"gold":rank===2?"silver":rank===3?"bronze":"";
@@ -708,11 +738,19 @@ function ClassementTab({ players, allPreds, allJokers, allWinnerPreds, officialS
             <div className="rank-info">
               <div className="rank-name">{r.name}</div>
               <div className="rank-detail">
-                {r.exact>0&&<span>⚽ {r.exact} exact{r.exact>1?"s":""} (+{r.exact*pts.exact}pts) · </span>}
-                {r.result>0&&<span>✓ {r.result} résultat{r.result>1?"s":""} (+{r.result*pts.result}pts) · </span>}
-                {r.jokerBonus>0&&<span className="jok">🃏 Joker ×{pts.joker} · </span>}
-                {r.winnerOK&&tw&&<span className="ok">🏆 +{pts.winnerBonus}pts vainqueur</span>}
-                {!r.exact&&!r.result&&!r.winnerOK&&<span>Aucun point</span>}
+                {system===1&&<>
+                  {r.exact>0&&<span>⚽ {r.exact} exact{r.exact>1?"s":""} (+{r.exact*P.exact}pts) · </span>}
+                  {r.result>0&&<span>✓ {r.result} résultat{r.result>1?"s":""} (+{r.result*P.result}pts) · </span>}
+                </>}
+                {system===2&&<>
+                  {r.winnerCount>0&&<span>🏆 {r.winnerCount} vainqueur{r.winnerCount>1?"s":""} (+{r.winnerCount*P2.winner}pts) · </span>}
+                  {r.homeCount>0&&<span>1️⃣ {r.homeCount}×dom. · </span>}
+                  {r.awayCount>0&&<span>2️⃣ {r.awayCount}×ext. · </span>}
+                  {r.diffCount>0&&<span>↔ {r.diffCount}×diff. · </span>}
+                </>}
+                {r.jokerBonus>0&&<span className="jok">🃏 Joker · </span>}
+                {r.winnerOK&&tw&&<span className="ok">🏆 +{system===1?P.winnerBonus:P2.winnerBonus}pts CdM</span>}
+                {!r.winnerOK&&(system===1?(r.exact||r.result):( r.winnerCount||r.homeCount||r.awayCount||r.diffCount))?null:<span>{r.total===0?"Aucun point":""}</span>}
               </div>
               {r.wPred&&<div className="rank-detail">🎯 Prédit : {r.wPred}</div>}
             </div>
@@ -723,6 +761,60 @@ function ClassementTab({ players, allPreds, allJokers, allWinnerPreds, officialS
           </div>
         );
       })}
+    </>
+  );
+}
+
+function ClassementTab({ players, allPreds, allJokers, allWinnerPreds, officialScores, settings }) {
+  const hasScores = Object.keys(officialScores||{}).length>0;
+  const tw  = settings.tournamentWinner||"";
+  const pts  = { ...DEFAULT_POINTS,   ...(settings.points||{}) };
+  const pts2 = { ...DEFAULT_POINTS_2, ...(settings.points2||{}) };
+  const display = settings.scoringDisplay||"s1"; // "s1" | "s2" | "both"
+
+  const [activeSystem, setActiveSystem] = useState(display==="s2"?2:1);
+
+  if (!hasScores) return (
+    <div className="no-scores"><div style={{fontSize:36,marginBottom:10}}>⏳</div>
+    <p style={{fontSize:13,color:"#3D5070",lineHeight:1.6}}>Le classement apparaîtra dès que<br/>l'admin aura saisi les premiers scores.</p></div>
+  );
+
+  const showBoth = display==="both";
+
+  return (
+    <>
+      {tw&&<div className="winner-banner">🏆 Vainqueur officiel : <strong>{tw}</strong></div>}
+
+      {/* Sélecteur de système si "les deux" */}
+      {showBoth&&(
+        <div className="phase-tabs-wrap" style={{marginBottom:16}}>
+          <button className={`phase-tab${activeSystem===1?" active":""}`} onClick={()=>setActiveSystem(1)}>
+            ⭐ Système 1
+          </button>
+          <button className={`phase-tab${activeSystem===2?" active":""}`} onClick={()=>setActiveSystem(2)}>
+            🔢 Système 2
+          </button>
+        </div>
+      )}
+
+      {/* Label du système affiché */}
+      {display!=="both"&&(
+        <div style={{fontSize:11,color:"#4E5E84",fontWeight:700,textTransform:"uppercase",letterSpacing:.7,marginBottom:12}}>
+          {display==="s1"?"⭐ Système 1 — Score exact / Bon résultat":"🔢 Système 2 — Vainqueur + buts individuels + différence"}
+        </div>
+      )}
+      {display==="both"&&(
+        <div style={{fontSize:11,color:"#4E5E84",fontWeight:700,textTransform:"uppercase",letterSpacing:.7,marginBottom:12}}>
+          {activeSystem===1?"⭐ Système 1 — Score exact / Bon résultat":"🔢 Système 2 — Vainqueur + buts individuels + différence"}
+        </div>
+      )}
+
+      <RankingList
+        players={players} allPreds={allPreds} allJokers={allJokers}
+        allWinnerPreds={allWinnerPreds} officialScores={officialScores}
+        tw={tw} pts={pts} pts2={pts2}
+        system={showBoth ? activeSystem : (display==="s2" ? 2 : 1)}
+      />
     </>
   );
 }
@@ -776,13 +868,14 @@ function CagnotteTab({ players, cagnotteSettings, paidPlayers, username }) {
 //  AdminPanel
 // ═══════════════════════════════════════════════════════════════
 function AdminPanel({ settings, officialScores, extraMatches, players, paidPlayers, onClose,
-  onToggleShowPreds, onSetTournamentWinner, onSaveScore, onDeleteScore, onSavePoints,
-  onAddMatch, onDeleteMatch, onSaveCagnotte, onTogglePaid, onToggleHideMatch }) {
+  onToggleShowPreds, onSetTournamentWinner, onSaveScore, onDeleteScore, onSavePoints, onSavePoints2,
+  onScoringDisplay, onSaveJokerCount, onAddMatch, onDeleteMatch, onSaveCagnotte, onTogglePaid, onToggleHideMatch }) {
 
   const [localScores, setLocalScores] = useState({});
   const [savedIds,    setSavedIds]    = useState({});
   const [winnerVal,   setWinnerVal]   = useState(settings.tournamentWinner||"");
-  const [pts,         setPts]         = useState({ ...DEFAULT_POINTS, ...(settings.points||{}) });
+  const [pts,         setPts]         = useState({ ...DEFAULT_POINTS,   ...(settings.points||{}) });
+  const [pts2,        setPts2]        = useState({ ...DEFAULT_POINTS_2, ...(settings.points2||{}) });
   // Cagnotte
   const [cAmount,  setCAmount]  = useState(settings.cagnotte?.amount || 2);
   const [cMethod,  setCMethod]  = useState(settings.cagnotte?.method || "");
@@ -851,11 +944,19 @@ function AdminPanel({ settings, officialScores, extraMatches, players, paidPlaye
               <span className="toggle-thumb"/>
             </button>
           </div>
+          <div className="toggle-row" style={{marginTop:10}}>
+            <span className="toggle-label">Nombre de jokers par joueur</span>
+            <input type="number" min="0" max="10"
+              style={{width:52,background:"#141E36",border:"1px solid #1B2A47",borderRadius:8,color:"#F5C842",fontFamily:"'Bebas Neue',sans-serif",fontSize:22,textAlign:"center",padding:"3px 4px"}}
+              defaultValue={settings.jokerCount??1}
+              onBlur={e=>onSaveJokerCount(Number(e.target.value))}
+            />
+          </div>
         </div>
 
-        {/* Système de points */}
+        {/* Système de points 1 */}
         <div className="admin-section">
-          <div className="admin-sec-title">⭐ Système de points</div>
+          <div className="admin-sec-title">⭐ Système 1 — Score exact / Bon résultat</div>
           <div className="pts-grid">
             {[
               {key:"exact",  label:"Score exact"},
@@ -871,6 +972,51 @@ function AdminPanel({ settings, officialScores, extraMatches, players, paidPlaye
                   onBlur={()=>onSavePoints(pts)}
                 />
               </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Système de points 2 */}
+        <div className="admin-section">
+          <div className="admin-sec-title">🔢 Système 2 — Vainqueur + buts + différence</div>
+          <div className="pts-grid">
+            {[
+              {key:"winner",      label:"Bon vainqueur ou nul"},
+              {key:"exactHome",   label:"Buts exacts équipe dom."},
+              {key:"exactAway",   label:"Buts exacts équipe ext."},
+              {key:"exactDiff",   label:"Différence de buts exacte"},
+              {key:"joker",       label:"Multiplicateur joker (×N)"},
+              {key:"winnerBonus", label:"Bonus vainqueur CdM"},
+            ].map(({key,label})=>(
+              <div key={key} className="pts-row">
+                <span className="pts-lbl">{label}</span>
+                <input type="number" min="0" max="50" className="pts-in"
+                  value={pts2[key]}
+                  onChange={e=>setPts2(p=>({...p,[key]:Number(e.target.value)}))}
+                  onBlur={()=>onSavePoints2(pts2)}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Affichage du classement */}
+        <div className="admin-section">
+          <div className="admin-sec-title">📊 Affichage du classement</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:4}}>
+            {[
+              {val:"s1",   label:"⭐ Système 1 uniquement"},
+              {val:"s2",   label:"🔢 Système 2 uniquement"},
+              {val:"both", label:"🔀 Les deux (avec onglets)"},
+            ].map(o=>(
+              <label key={o.val} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",padding:"6px 0"}}>
+                <input type="radio" name="scoring_display"
+                  checked={(settings.scoringDisplay||"s1")===o.val}
+                  onChange={()=>onScoringDisplay(o.val)}
+                  style={{accentColor:"#F5C842",width:16,height:16}}
+                />
+                <span style={{fontSize:13,color:"#D0DCFF",fontWeight:500}}>{o.label}</span>
+              </label>
             ))}
           </div>
         </div>
@@ -1022,7 +1168,7 @@ export default function App() {
   const [username,       setUsername]       = useState(null);
   const [nameInput,      setNameInput]      = useState("");
   const [myPreds,        setMyPreds]        = useState({});
-  const [myJoker,        setMyJoker]        = useState(null);
+  const [myJokers,       setMyJokers]       = useState([]);
   const [myWinnerPred,   setMyWinnerPred]   = useState(null);
   const [players,        setPlayers]        = useState([]);
   const [allPreds,       setAllPreds]       = useState({});
@@ -1064,7 +1210,7 @@ export default function App() {
       setPaidPlayers(d.cagnotte?.paid||{});
 
       setMyPreds(d.preds?.[k]||{});
-      setMyJoker(d.jokers?.[k]||null);
+      setMyJokers(normalizeJokers(d.jokers?.[k]));
 
       const wp=d.winnerPreds?.[k]||null;
       setMyWinnerPred(wp);
@@ -1080,7 +1226,6 @@ export default function App() {
   },[username]);
 
   const allMatches = [...BASE_MATCHES, ...extraMatches];
-  const jokerIsLocked = myJoker && isLocked(allMatches.find(m=>m.id===myJoker)?.kickoff??"9999");
 
   const showToast=msg=>{ setToast(msg); setTimeout(()=>setToast(null),2200); };
 
@@ -1098,10 +1243,11 @@ export default function App() {
     showToast("✓ Prono enregistré");
   }
 
-  async function saveJoker(matchId) {
-    setMyJoker(matchId);
-    await set(ref(db,jPath(username)),matchId||null);
-    if (matchId) showToast("🃏 Joker placé !");
+  async function saveJoker(jokerArray) {
+    setMyJokers(jokerArray);
+    const obj = jokerArray.length>0 ? Object.fromEntries(jokerArray.map(id=>[id,true])) : null;
+    await set(ref(db,jPath(username)), obj);
+    if (jokerArray.length > (myJokers?.length||0)) showToast("🃏 Joker placé !");
   }
 
   async function saveWinnerPred(team) {
@@ -1121,6 +1267,11 @@ export default function App() {
   async function saveSettings(changes) {
     await update(ref(db,`${APP}/settings`),changes);
   }
+
+  const savePoints         = pts  => saveSettings({points:pts});
+  const savePoints2        = pts2 => saveSettings({points2:pts2});
+  const saveScoringDisplay = v    => saveSettings({scoringDisplay:v});
+  const saveJokerCount     = n    => saveSettings({jokerCount:n});
 
   async function addExtraMatch(data) {
     const id="E"+Date.now();
@@ -1208,7 +1359,10 @@ export default function App() {
             onSetTournamentWinner={v=>saveSettings({tournamentWinner:v})}
             onSaveScore={saveOfficialScore}
             onDeleteScore={deleteOfficialScore}
-            onSavePoints={pts=>saveSettings({points:pts})}
+            onSavePoints={savePoints}
+            onSavePoints2={savePoints2}
+            onScoringDisplay={saveScoringDisplay}
+            onSaveJokerCount={saveJokerCount}
             onAddMatch={addExtraMatch} onDeleteMatch={deleteExtraMatch}
             onSaveCagnotte={saveCagnotte} onTogglePaid={togglePaid}
             onToggleHideMatch={toggleHideMatch}
@@ -1250,9 +1404,9 @@ export default function App() {
         {/* CONTENU */}
         <div className="content">
           {activeTab==="pronos"&&(
-            <PronosTab allMatches={allMatches} myPreds={myPreds} myJoker={myJoker}
-              jokerIsLocked={jokerIsLocked} officialScores={officialScores}
-              players={players} settings={settings} onSave={savePred} onJoker={saveJoker}
+            <PronosTab allMatches={allMatches} myPreds={myPreds} myJokers={myJokers}
+              officialScores={officialScores} players={players} settings={settings}
+              onSave={savePred} onJoker={saveJoker}
               hiddenMatches={settings.hiddenMatches||{}}
             />
           )}
