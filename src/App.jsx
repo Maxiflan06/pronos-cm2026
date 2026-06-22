@@ -157,7 +157,8 @@ function calcPoints(preds, scores, jokerMatchIds, winnerPred, tournamentWinner, 
   }
   const winnerOK = tournamentWinner&&winnerPred&&norm(winnerPred)===norm(tournamentWinner);
   if (winnerOK) total+=P.winnerBonus;
-  return { total, exact, result, jokerBonus, winnerOK };
+  const jokerExtra = Math.round(jokerBonus*(P.joker-1));
+  return { total, exact, result, jokerBonus, jokerExtra, winnerOK };
 }
 
 function calcPoints2(preds, scores, jokerMatchIds, winnerPred, tournamentWinner, pts2) {
@@ -177,7 +178,8 @@ function calcPoints2(preds, scores, jokerMatchIds, winnerPred, tournamentWinner,
   }
   const winnerOK = tournamentWinner&&winnerPred&&norm(winnerPred)===norm(tournamentWinner);
   if (winnerOK) total+=P.winnerBonus;
-  return { total, winnerCount, homeCount, awayCount, diffCount, jokerBonus, winnerOK };
+  const jokerExtra = Math.round(jokerBonus*(P.joker-1));
+  return { total, winnerCount, homeCount, awayCount, diffCount, jokerBonus, jokerExtra, winnerOK };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -749,7 +751,7 @@ function RankingList({ players, allPreds, allJokers, allWinnerPreds, officialSco
                   {r.awayCount>0&&<span>2️⃣ {r.awayCount}×ext. · </span>}
                   {r.diffCount>0&&<span>↔ {r.diffCount}×diff. · </span>}
                 </>}
-                {r.jokerBonus>0&&<span className="jok">🃏 Joker · </span>}
+                {r.jokerExtra>0&&<span className="jok">🃏 +{r.jokerExtra} pts (joker) · </span>}
                 {r.winnerOK&&tw&&<span className="ok">🏆 +{system===1?P.winnerBonus:P2.winnerBonus}pts CdM</span>}
                 {!r.winnerOK&&(system===1?(r.exact||r.result):( r.winnerCount||r.homeCount||r.awayCount||r.diffCount))?null:<span>{r.total===0?"Aucun point":""}</span>}
               </div>
