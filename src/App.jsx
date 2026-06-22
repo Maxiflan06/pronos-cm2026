@@ -53,56 +53,56 @@ const BASE_MATCHES = [
   { id:"K2", group:"K", day:1, home:"Ouzbékistan",     away:"Colombie",         kickoff:"2026-06-18T04:00:00+02:00", venue:"Mexico City" },
 
   // ── JOURNÉE 2 ─────────────────────────────────────────────
-  { id:"A3", group:"A", day:2, home:"Tchéquie",        away:"Afrique du Sud",   kickoff:"2026-06-18T16:00:00+02:00", venue:"Atlanta" },
-  { id:"B3", group:"B", day:2, home:"Suisse",          away:"Bosnie-Herz.",     kickoff:"2026-06-18T19:00:00+02:00", venue:"Los Angeles" },
-  { id:"B4", group:"B", day:2, home:"Canada",          away:"Qatar",            kickoff:"2026-06-18T22:00:00+02:00", venue:"Vancouver" },
-  { id:"A4", group:"A", day:2, home:"Mexique",         away:"Corée du Sud",     kickoff:"2026-06-19T01:00:00+02:00", venue:"Guadalajara" },
-  { id:"D3", group:"D", day:2, home:"États-Unis",      away:"Australie",        kickoff:"2026-06-19T19:00:00+02:00", venue:"Seattle" },
-  { id:"C3", group:"C", day:2, home:"Écosse",          away:"Maroc",            kickoff:"2026-06-19T22:00:00+02:00", venue:"Boston" },
-  { id:"C4", group:"C", day:2, home:"Brésil",          away:"Haïti",            kickoff:"2026-06-20T00:30:00+02:00", venue:"Philadelphie" },
-  { id:"D4", group:"D", day:2, home:"Turquie",         away:"Paraguay",         kickoff:"2026-06-20T03:00:00+02:00", venue:"San Francisco" },
-  { id:"F3", group:"F", day:2, home:"Pays-Bas",        away:"Suède",            kickoff:"2026-06-20T17:00:00+02:00", venue:"Houston" },
-  { id:"E3", group:"E", day:2, home:"Allemagne",       away:"Côte d'Ivoire",    kickoff:"2026-06-20T20:00:00+02:00", venue:"Toronto" },
-  { id:"E4", group:"E", day:2, home:"Équateur",        away:"Curaçao",          kickoff:"2026-06-21T00:00:00+02:00", venue:"Kansas City" },
-  { id:"F4", group:"F", day:2, home:"Tunisie",         away:"Japon",            kickoff:"2026-06-21T04:00:00+02:00", venue:"Monterrey" },
-  { id:"H3", group:"H", day:2, home:"Espagne",         away:"Arabie Saoudite",  kickoff:"2026-06-21T16:00:00+02:00", venue:"Atlanta" },
-  { id:"G3", group:"G", day:2, home:"Belgique",        away:"Iran",             kickoff:"2026-06-21T19:00:00+02:00", venue:"Los Angeles" },
-  { id:"H4", group:"H", day:2, home:"Uruguay",         away:"Cap Vert",         kickoff:"2026-06-21T22:00:00+02:00", venue:"Miami" },
-  { id:"G4", group:"G", day:2, home:"Nouvelle-Zélande",away:"Égypte",           kickoff:"2026-06-22T01:00:00+02:00", venue:"Vancouver" },
-  { id:"J3", group:"J", day:2, home:"Argentine",       away:"Autriche",         kickoff:"2026-06-22T17:00:00+02:00", venue:"Dallas" },
-  { id:"I3", group:"I", day:2, home:"France",          away:"Irak",             kickoff:"2026-06-22T21:00:00+02:00", venue:"Philadelphie" },
-  { id:"I4", group:"I", day:2, home:"Norvège",         away:"Sénégal",          kickoff:"2026-06-23T00:00:00+02:00", venue:"New York" },
-  { id:"J4", group:"J", day:2, home:"Jordanie",        away:"Algérie",          kickoff:"2026-06-23T03:00:00+02:00", venue:"San Francisco" },
-  { id:"K3", group:"K", day:2, home:"Portugal",        away:"Ouzbékistan",      kickoff:"2026-06-23T17:00:00+02:00", venue:"Houston" },
-  { id:"L3", group:"L", day:2, home:"Angleterre",      away:"Ghana",            kickoff:"2026-06-23T20:00:00+02:00", venue:"Boston" },
-  { id:"L4", group:"L", day:2, home:"Panama",          away:"Croatie",          kickoff:"2026-06-23T23:00:00+02:00", venue:"Toronto" },
-  { id:"K4", group:"K", day:2, home:"Colombie",        away:"Congo",            kickoff:"2026-06-24T02:00:00+02:00", venue:"Guadalajara" },
+  { id:"A3", group:"A", day:2, home:"Tchéquie",        away:"Afrique du Sud",   kickoff:"2026-06-18T18:00:00+02:00", venue:"Atlanta" },
+  { id:"B3", group:"B", day:2, home:"Suisse",          away:"Bosnie-Herz.",     kickoff:"2026-06-18T21:00:00+02:00", venue:"Los Angeles" },
+  { id:"B4", group:"B", day:2, home:"Canada",          away:"Qatar",            kickoff:"2026-06-19T00:00:00+02:00", venue:"Vancouver" },
+  { id:"A4", group:"A", day:2, home:"Mexique",         away:"Corée du Sud",     kickoff:"2026-06-19T03:00:00+02:00", venue:"Guadalajara" },
+  { id:"D3", group:"D", day:2, home:"États-Unis",      away:"Australie",        kickoff:"2026-06-19T21:00:00+02:00", venue:"Seattle" },
+  { id:"C3", group:"C", day:2, home:"Écosse",          away:"Maroc",            kickoff:"2026-06-20T00:00:00+02:00", venue:"Boston" },
+  { id:"C4", group:"C", day:2, home:"Brésil",          away:"Haïti",            kickoff:"2026-06-20T02:30:00+02:00", venue:"Philadelphie" },
+  { id:"D4", group:"D", day:2, home:"Turquie",         away:"Paraguay",         kickoff:"2026-06-20T05:00:00+02:00", venue:"San Francisco" },
+  { id:"F3", group:"F", day:2, home:"Pays-Bas",        away:"Suède",            kickoff:"2026-06-20T19:00:00+02:00", venue:"Houston" },
+  { id:"E3", group:"E", day:2, home:"Allemagne",       away:"Côte d'Ivoire",    kickoff:"2026-06-20T22:00:00+02:00", venue:"Toronto" },
+  { id:"E4", group:"E", day:2, home:"Équateur",        away:"Curaçao",          kickoff:"2026-06-21T02:00:00+02:00", venue:"Kansas City" },
+  { id:"F4", group:"F", day:2, home:"Tunisie",         away:"Japon",            kickoff:"2026-06-21T06:00:00+02:00", venue:"Monterrey" },
+  { id:"H3", group:"H", day:2, home:"Espagne",         away:"Arabie Saoudite",  kickoff:"2026-06-21T18:00:00+02:00", venue:"Atlanta" },
+  { id:"G3", group:"G", day:2, home:"Belgique",        away:"Iran",             kickoff:"2026-06-21T21:00:00+02:00", venue:"Los Angeles" },
+  { id:"H4", group:"H", day:2, home:"Uruguay",         away:"Cap Vert",         kickoff:"2026-06-22T00:00:00+02:00", venue:"Miami" },
+  { id:"G4", group:"G", day:2, home:"Nouvelle-Zélande",away:"Égypte",           kickoff:"2026-06-22T03:00:00+02:00", venue:"Vancouver" },
+  { id:"J3", group:"J", day:2, home:"Argentine",       away:"Autriche",         kickoff:"2026-06-22T19:00:00+02:00", venue:"Dallas" },
+  { id:"I3", group:"I", day:2, home:"France",          away:"Irak",             kickoff:"2026-06-22T23:00:00+02:00", venue:"Philadelphie" },
+  { id:"I4", group:"I", day:2, home:"Norvège",         away:"Sénégal",          kickoff:"2026-06-23T02:00:00+02:00", venue:"New York" },
+  { id:"J4", group:"J", day:2, home:"Jordanie",        away:"Algérie",          kickoff:"2026-06-23T05:00:00+02:00", venue:"San Francisco" },
+  { id:"K3", group:"K", day:2, home:"Portugal",        away:"Ouzbékistan",      kickoff:"2026-06-23T19:00:00+02:00", venue:"Houston" },
+  { id:"L3", group:"L", day:2, home:"Angleterre",      away:"Ghana",            kickoff:"2026-06-23T22:00:00+02:00", venue:"Boston" },
+  { id:"L4", group:"L", day:2, home:"Panama",          away:"Croatie",          kickoff:"2026-06-24T01:00:00+02:00", venue:"Toronto" },
+  { id:"K4", group:"K", day:2, home:"Colombie",        away:"Congo",            kickoff:"2026-06-24T04:00:00+02:00", venue:"Guadalajara" },
 
   // ── JOURNÉE 3 — matchs simultanés par groupe ──────────────
-  { id:"B5", group:"B", day:3, home:"Suisse",          away:"Canada",           kickoff:"2026-06-24T19:00:00+02:00", venue:"Vancouver" },
-  { id:"B6", group:"B", day:3, home:"Bosnie-Herz.",    away:"Qatar",            kickoff:"2026-06-24T19:00:00+02:00", venue:"Seattle" },
-  { id:"C5", group:"C", day:3, home:"Écosse",          away:"Brésil",           kickoff:"2026-06-24T22:00:00+02:00", venue:"Miami" },
-  { id:"C6", group:"C", day:3, home:"Maroc",           away:"Haïti",            kickoff:"2026-06-24T22:00:00+02:00", venue:"Atlanta" },
-  { id:"A5", group:"A", day:3, home:"Tchéquie",        away:"Mexique",          kickoff:"2026-06-25T01:00:00+02:00", venue:"Mexico City" },
-  { id:"A6", group:"A", day:3, home:"Afrique du Sud",  away:"Corée du Sud",     kickoff:"2026-06-25T01:00:00+02:00", venue:"Monterrey" },
-  { id:"E5", group:"E", day:3, home:"Curaçao",         away:"Côte d'Ivoire",    kickoff:"2026-06-25T20:00:00+02:00", venue:"Philadelphie" },
-  { id:"E6", group:"E", day:3, home:"Équateur",        away:"Allemagne",        kickoff:"2026-06-25T20:00:00+02:00", venue:"New York" },
-  { id:"F5", group:"F", day:3, home:"Japon",           away:"Suède",            kickoff:"2026-06-25T23:00:00+02:00", venue:"Dallas" },
-  { id:"F6", group:"F", day:3, home:"Tunisie",         away:"Pays-Bas",         kickoff:"2026-06-25T23:00:00+02:00", venue:"Kansas City" },
-  { id:"D5", group:"D", day:3, home:"Turquie",         away:"États-Unis",       kickoff:"2026-06-26T02:00:00+02:00", venue:"Los Angeles" },
-  { id:"D6", group:"D", day:3, home:"Paraguay",        away:"Australie",        kickoff:"2026-06-26T02:00:00+02:00", venue:"San Francisco" },
-  { id:"I5", group:"I", day:3, home:"Norvège",         away:"France",           kickoff:"2026-06-26T19:00:00+02:00", venue:"Boston" },
-  { id:"I6", group:"I", day:3, home:"Sénégal",         away:"Irak",             kickoff:"2026-06-26T19:00:00+02:00", venue:"Toronto" },
-  { id:"H5", group:"H", day:3, home:"Cap Vert",        away:"Arabie Saoudite",  kickoff:"2026-06-27T00:00:00+02:00", venue:"Houston" },
-  { id:"H6", group:"H", day:3, home:"Uruguay",         away:"Espagne",          kickoff:"2026-06-27T00:00:00+02:00", venue:"Guadalajara" },
-  { id:"G5", group:"G", day:3, home:"Égypte",          away:"Iran",             kickoff:"2026-06-27T03:00:00+02:00", venue:"Seattle" },
-  { id:"G6", group:"G", day:3, home:"Nouvelle-Zélande",away:"Belgique",         kickoff:"2026-06-27T03:00:00+02:00", venue:"Vancouver" },
-  { id:"L5", group:"L", day:3, home:"Panama",          away:"Angleterre",       kickoff:"2026-06-27T21:00:00+02:00", venue:"New York" },
-  { id:"L6", group:"L", day:3, home:"Croatie",         away:"Ghana",            kickoff:"2026-06-27T21:00:00+02:00", venue:"Philadelphie" },
-  { id:"K5", group:"K", day:3, home:"Colombie",        away:"Portugal",         kickoff:"2026-06-27T23:30:00+02:00", venue:"Miami" },
-  { id:"K6", group:"K", day:3, home:"Congo",           away:"Ouzbékistan",      kickoff:"2026-06-27T23:30:00+02:00", venue:"Atlanta" },
-  { id:"J5", group:"J", day:3, home:"Algérie",         away:"Autriche",         kickoff:"2026-06-28T02:00:00+02:00", venue:"Kansas City" },
-  { id:"J6", group:"J", day:3, home:"Jordanie",        away:"Argentine",        kickoff:"2026-06-28T02:00:00+02:00", venue:"Dallas" },
+  { id:"B5", group:"B", day:3, home:"Suisse",          away:"Canada",           kickoff:"2026-06-24T21:00:00+02:00", venue:"Vancouver" },
+  { id:"B6", group:"B", day:3, home:"Bosnie-Herz.",    away:"Qatar",            kickoff:"2026-06-24T21:00:00+02:00", venue:"Seattle" },
+  { id:"C5", group:"C", day:3, home:"Écosse",          away:"Brésil",           kickoff:"2026-06-25T00:00:00+02:00", venue:"Miami" },
+  { id:"C6", group:"C", day:3, home:"Maroc",           away:"Haïti",            kickoff:"2026-06-25T00:00:00+02:00", venue:"Atlanta" },
+  { id:"A5", group:"A", day:3, home:"Tchéquie",        away:"Mexique",          kickoff:"2026-06-25T03:00:00+02:00", venue:"Mexico City" },
+  { id:"A6", group:"A", day:3, home:"Afrique du Sud",  away:"Corée du Sud",     kickoff:"2026-06-25T03:00:00+02:00", venue:"Monterrey" },
+  { id:"E5", group:"E", day:3, home:"Curaçao",         away:"Côte d'Ivoire",    kickoff:"2026-06-25T22:00:00+02:00", venue:"Philadelphie" },
+  { id:"E6", group:"E", day:3, home:"Équateur",        away:"Allemagne",        kickoff:"2026-06-25T22:00:00+02:00", venue:"New York" },
+  { id:"F5", group:"F", day:3, home:"Japon",           away:"Suède",            kickoff:"2026-06-26T01:00:00+02:00", venue:"Dallas" },
+  { id:"F6", group:"F", day:3, home:"Tunisie",         away:"Pays-Bas",         kickoff:"2026-06-26T01:00:00+02:00", venue:"Kansas City" },
+  { id:"D5", group:"D", day:3, home:"Turquie",         away:"États-Unis",       kickoff:"2026-06-26T04:00:00+02:00", venue:"Los Angeles" },
+  { id:"D6", group:"D", day:3, home:"Paraguay",        away:"Australie",        kickoff:"2026-06-26T04:00:00+02:00", venue:"San Francisco" },
+  { id:"I5", group:"I", day:3, home:"Norvège",         away:"France",           kickoff:"2026-06-26T21:00:00+02:00", venue:"Boston" },
+  { id:"I6", group:"I", day:3, home:"Sénégal",         away:"Irak",             kickoff:"2026-06-26T21:00:00+02:00", venue:"Toronto" },
+  { id:"H5", group:"H", day:3, home:"Cap Vert",        away:"Arabie Saoudite",  kickoff:"2026-06-27T02:00:00+02:00", venue:"Houston" },
+  { id:"H6", group:"H", day:3, home:"Uruguay",         away:"Espagne",          kickoff:"2026-06-27T02:00:00+02:00", venue:"Guadalajara" },
+  { id:"G5", group:"G", day:3, home:"Égypte",          away:"Iran",             kickoff:"2026-06-27T05:00:00+02:00", venue:"Seattle" },
+  { id:"G6", group:"G", day:3, home:"Nouvelle-Zélande",away:"Belgique",         kickoff:"2026-06-27T05:00:00+02:00", venue:"Vancouver" },
+  { id:"L5", group:"L", day:3, home:"Panama",          away:"Angleterre",       kickoff:"2026-06-27T23:00:00+02:00", venue:"New York" },
+  { id:"L6", group:"L", day:3, home:"Croatie",         away:"Ghana",            kickoff:"2026-06-27T23:00:00+02:00", venue:"Philadelphie" },
+  { id:"K5", group:"K", day:3, home:"Colombie",        away:"Portugal",         kickoff:"2026-06-28T01:30:00+02:00", venue:"Miami" },
+  { id:"K6", group:"K", day:3, home:"Congo",           away:"Ouzbékistan",      kickoff:"2026-06-28T01:30:00+02:00", venue:"Atlanta" },
+  { id:"J5", group:"J", day:3, home:"Algérie",         away:"Autriche",         kickoff:"2026-06-28T04:00:00+02:00", venue:"Kansas City" },
+  { id:"J6", group:"J", day:3, home:"Jordanie",        away:"Argentine",        kickoff:"2026-06-28T04:00:00+02:00", venue:"Dallas" },
 ];
 
 const DEFAULT_POINTS = { exact: 3, result: 1, joker: 2, winnerBonus: 15 };
@@ -136,8 +136,9 @@ const norm = s => (s||"").replace(/^\S+\s*/,"").toLowerCase().trim();
 // Compatibilité ascendante : ancien format = string, nouveau = {matchId: true}
 const normalizeJokers = val => {
   if (!val) return [];
-  if (typeof val === 'string') return [val];
-  if (typeof val === 'object') return Object.keys(val);
+  if (Array.isArray(val)) return val;           // déjà un tableau
+  if (typeof val === 'string') return [val];    // ancien format (string unique)
+  if (typeof val === 'object') return Object.keys(val); // format Firebase {matchId: true}
   return [];
 };
 
@@ -265,10 +266,10 @@ body{font-family:'Outfit',sans-serif;background:#080D1A;color:#E2E8FF;min-height
 .p-chip{background:rgba(245,200,66,.08);border:1px solid rgba(245,200,66,.18);color:#907840;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;}
 .p-chip.me{background:rgba(245,200,66,.18);border-color:rgba(245,200,66,.5);color:#F5C842;}
 .hidden-notice{background:rgba(245,200,66,.05);border:1px solid rgba(245,200,66,.15);border-radius:10px;padding:10px 14px;font-size:12px;color:#907840;text-align:center;margin-bottom:12px;}
-.scroll-wrap{overflow-x:auto;border-radius:12px;border:1px solid #1B2A47;}
+.scroll-wrap{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 220px);border-radius:12px;border:1px solid #1B2A47;}
 .cmp-table{width:100%;border-collapse:collapse;font-size:12px;}
-.cmp-table th{background:#0F182C;padding:8px 12px;text-align:center;color:#4E5E84;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #1B2A47;white-space:nowrap;}
-.cmp-table th.mc{text-align:left;min-width:130px;position:sticky;left:0;background:#0F182C;}
+.cmp-table th{background:#0F182C;padding:8px 12px;text-align:center;color:#4E5E84;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #1B2A47;white-space:nowrap;position:sticky;top:0;z-index:2;}
+.cmp-table th.mc{text-align:left;min-width:130px;position:sticky;left:0;top:0;z-index:3;background:#0F182C;}
 .cmp-table td{padding:8px 12px;border-bottom:1px solid rgba(27,42,71,.5);text-align:center;white-space:nowrap;}
 .cmp-table td.mc{text-align:left;color:#8A9AC0;font-weight:600;font-size:11px;position:sticky;left:0;background:#0D1425;}
 .cmp-table tr:last-child td{border-bottom:none;}
