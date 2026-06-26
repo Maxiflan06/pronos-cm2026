@@ -122,6 +122,7 @@ const jPath = u => `${APP}/jokers/${fKey(u)}`;
 const wPath = u => `${APP}/winnerPreds/${fKey(u)}`;
 
 // ── Firebase init ─────────────────────────────────────────────
+const firebaseOK = !FIREBASE_CONFIG.apiKey.startsWith("VOTRE");
 const fApp = initializeApp(FIREBASE_CONFIG);
 const db   = getDatabase(fApp);
 
