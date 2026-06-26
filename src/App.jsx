@@ -136,15 +136,24 @@ const norm = s => (s||"").replace(/^\S+\s*/,"").toLowerCase().trim();
 // Compatibilité ascendante : ancien format = string, nouveau = {matchId: true}
 const normalizeJokers = val => {
   if (!val) return [];
-  if (Array.isArray(val)) return val;           // déjà un tableau
-  if (typeof val === 'string') return [val];    // ancien format (string unique)
-  if (typeof val === 'object') return Object.keys(val); // format Firebase {matchId: true}
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') return [val];
+  if (typeof val === 'object') return Object.keys(val);
   return [];
 };
 
-function calcPoints(preds, scores, jokerMatchIds, winnerPred, tournamentWinner, pts) {
-  const P = { ...DEFAULT_POINTS, ...(pts||{}) };
+// Coefficients multiplicatifs par phase (1 = pas de modification)
+const DEFAULT_PHASE_COEFS = { "Groupes": 1 };
+
+// Jokers : 3 pour la phase de groupes, 1 pour la phase finale
+const DEFAULT_GROUP_JOKER_COUNT    = 3;
+const DEFAULT_KNOCKOUT_JOKER_COUNT = 1;
+const isGroupMatch = id => BASE_MATCHES.some(m => m.id === id);
+
+function calcPoints(preds, scores, jokerMatchIds, winnerPred, tournamentWinner, pts, matchPhaseMap, phaseCoefs) {
+  const P    = { ...DEFAULT_POINTS, ...(pts||{}) };
   const jIds = normalizeJokers(jokerMatchIds);
+  const coefs = { ...DEFAULT_PHASE_COEFS, ...(phaseCoefs||{}) };
   let total=0, exact=0, result=0, jokerBonus=0;
   for (const [id, pred] of Object.entries(preds||{})) {
     const s = scores?.[id];
@@ -152,6 +161,8 @@ function calcPoints(preds, scores, jokerMatchIds, winnerPred, tournamentWinner, 
     let p=0;
     if (pred.home===s.home&&pred.away===s.away) { p=P.exact; exact++; }
     else if (Math.sign(pred.home-pred.away)===Math.sign(s.home-s.away)) { p=P.result; result++; }
+    const coef = coefs[matchPhaseMap?.[id] ?? "Groupes"] ?? 1;
+    if (coef!==1) p = Math.round(p*coef);
     if (jIds.includes(id)) { jokerBonus+=p; p=Math.round(p*P.joker); }
     total+=p;
   }
@@ -161,9 +172,10 @@ function calcPoints(preds, scores, jokerMatchIds, winnerPred, tournamentWinner, 
   return { total, exact, result, jokerBonus, jokerExtra, winnerOK };
 }
 
-function calcPoints2(preds, scores, jokerMatchIds, winnerPred, tournamentWinner, pts2) {
-  const P = { ...DEFAULT_POINTS_2, ...(pts2||{}) };
+function calcPoints2(preds, scores, jokerMatchIds, winnerPred, tournamentWinner, pts2, matchPhaseMap, phaseCoefs) {
+  const P    = { ...DEFAULT_POINTS_2, ...(pts2||{}) };
   const jIds = normalizeJokers(jokerMatchIds);
+  const coefs = { ...DEFAULT_PHASE_COEFS, ...(phaseCoefs||{}) };
   let total=0, winnerCount=0, homeCount=0, awayCount=0, diffCount=0, jokerBonus=0;
   for (const [id, pred] of Object.entries(preds||{})) {
     const s = scores?.[id];
@@ -173,6 +185,8 @@ function calcPoints2(preds, scores, jokerMatchIds, winnerPred, tournamentWinner,
     if (pred.home===s.home) { p+=P.exactHome; homeCount++; }
     if (pred.away===s.away) { p+=P.exactAway; awayCount++; }
     if ((pred.home-pred.away)===(s.home-s.away)) { p+=P.exactDiff; diffCount++; }
+    const coef = coefs[matchPhaseMap?.[id] ?? "Groupes"] ?? 1;
+    if (coef!==1) p = Math.round(p*coef);
     if (jIds.includes(id)) { jokerBonus+=p; p=Math.round(p*P.joker); }
     total+=p;
   }
@@ -454,7 +468,7 @@ function WinnerModal({ onSubmit }) {
 // ═══════════════════════════════════════════════════════════════
 //  MatchCard
 // ═══════════════════════════════════════════════════════════════
-function MatchCard({ match, pred, onSave, myJokers, jokerCount, onJokerToggle, officialScore }) {
+function MatchCard({ match, pred, onSave, myJokers, groupJokerMax, knockoutJokerMax, onJokerToggle, officialScore }) {
   const locked = isLocked(match.kickoff);
   const [h, setH] = useState(pred?.home!=null?String(pred.home):"");
   const [a, setA] = useState(pred?.away!=null?String(pred.away):"");
@@ -464,12 +478,22 @@ function MatchCard({ match, pred, onSave, myJokers, jokerCount, onJokerToggle, o
   },[pred?.home,pred?.away]);
   const trySave=(lh,la)=>{ if(lh!==""&&la!==""&&!locked) onSave(match.id,Number(lh),Number(la)); };
 
-  const jokers     = normalizeJokers(myJokers);
-  const isJ        = jokers.includes(match.id);
-  const canAdd     = !isJ && !locked && jokers.length < jokerCount;
-  const canRemove  = isJ && !locked;
-  const showJoker  = isJ || canAdd;
-  const multiplier = jokerCount > 0 ? (isJ ? "×?" : "") : "";
+  const jokers   = normalizeJokers(myJokers);
+  const isJ      = jokers.includes(match.id);
+  const isGroup  = !!match.group;
+
+  const groupJokersPlaced   = jokers.filter(isGroupMatch).length;
+  const knockoutJokersPlaced = jokers.filter(id=>!isGroupMatch(id)).length;
+  const poolMax  = isGroup ? groupJokerMax : knockoutJokerMax;
+  const poolUsed = isGroup ? groupJokersPlaced : knockoutJokersPlaced;
+
+  const canAdd    = !isJ && !locked && poolUsed < poolMax;
+  const canRemove = isJ && !locked;
+  const showJoker = isJ || canAdd;
+
+  const jokerLabel = isGroup
+    ? (isJ ? `🃏 Joker groupes actif` : `🃏 Placer un joker groupes (${poolUsed}/${poolMax})`)
+    : (isJ ? `⭐ Joker finale actif`  : `⭐ Placer le joker finale (${poolUsed}/${poolMax})`);
 
   return (
     <div className={`card${locked?" locked":""}`}>
@@ -508,9 +532,7 @@ function MatchCard({ match, pred, onSave, myJokers, jokerCount, onJokerToggle, o
               if (canRemove) onJokerToggle(jokers.filter(id=>id!==match.id));
               else if (canAdd) onJokerToggle([...jokers, match.id]);
             }}
-          >
-            {isJ ? "🃏 Joker actif — points ×?" : `🃏 Placer un joker (${jokers.length}/${jokerCount} utilisé${jokers.length>1?"s":""})`}
-          </button>
+          >{jokerLabel}</button>
         </div>
       )}
     </div>
@@ -521,9 +543,12 @@ function MatchCard({ match, pred, onSave, myJokers, jokerCount, onJokerToggle, o
 //  PronosTab
 // ═══════════════════════════════════════════════════════════════
 function PronosTab({ allMatches, myPreds, myJokers, officialScores, players, settings, onSave, onJoker, hiddenMatches }) {
-  const pts       = { ...DEFAULT_POINTS, ...(settings.points||{}) };
-  const jokerCount = settings.jokerCount ?? 1;
-  const jokers    = normalizeJokers(myJokers);
+  const pts              = { ...DEFAULT_POINTS, ...(settings.points||{}) };
+  const groupJokerMax    = settings.groupJokerCount    ?? DEFAULT_GROUP_JOKER_COUNT;
+  const knockoutJokerMax = settings.knockoutJokerCount ?? DEFAULT_KNOCKOUT_JOKER_COUNT;
+  const jokers           = normalizeJokers(myJokers);
+  const groupJokers      = jokers.filter(isGroupMatch);
+  const knockoutJokers   = jokers.filter(id => !isGroupMatch(id));
 
   const visibleMatches = allMatches.filter(m=>!(hiddenMatches||{})[m.id]);
   const totalPreds     = Object.keys(myPreds).length;
@@ -542,7 +567,6 @@ function PronosTab({ allMatches, myPreds, myJokers, officialScores, players, set
     ...[1,2,3].filter(hasDayMatches).map(d=>({ key:`J${d}`, label:`Journée ${d}` })),
     ...extraPhases.map(p=>({ key:`P:${p}`, label:p })),
   ];
-
   const defaultTab = phaseTabs.find(t=>{
     const ms = t.key.startsWith("J")
       ? visibleMatches.filter(m=>m.group&&m.day===Number(t.key[1]))
@@ -552,6 +576,7 @@ function PronosTab({ allMatches, myPreds, myJokers, officialScores, players, set
 
   const [activePhase, setActivePhase] = useState(defaultTab?.key||"J1");
 
+  const isKnockoutTab = activePhase.startsWith("P:");
   const tabMatches = visibleMatches
     .filter(m => activePhase.startsWith("J")
       ? m.group && m.day===Number(activePhase[1])
@@ -559,9 +584,10 @@ function PronosTab({ allMatches, myPreds, myJokers, officialScores, players, set
     )
     .sort((a,b)=>new Date(a.kickoff)-new Date(b.kickoff));
 
-  // Joker banner
-  const lockedJokers   = jokers.filter(id=>isLocked(allMatches.find(m=>m.id===id)?.kickoff??"9999"));
-  const remainingSlots = jokerCount - jokers.length;
+  // Banners jokers
+  const groupRemaining   = groupJokerMax   - groupJokers.length;
+  const knockoutRemaining = knockoutJokerMax - knockoutJokers.length;
+  const groupLockedJokers = groupJokers.filter(id=>isLocked(BASE_MATCHES.find(m=>m.id===id)?.kickoff??"9999"));
 
   return (
     <>
@@ -572,10 +598,18 @@ function PronosTab({ allMatches, myPreds, myJokers, officialScores, players, set
         <div className="stat-box"><div className="stat-num">{players.length}</div><div className="stat-lbl">Joueurs</div></div>
       </div>
 
-      {jokerCount>0&&(
-        remainingSlots>0
-          ? <div className="info-bar">🃏 <strong>{remainingSlots} joker{remainingSlots>1?"s":""} disponible{remainingSlots>1?"s":""}</strong> sur {jokerCount} — multipliez vos points par <strong>{pts.joker}×</strong> !</div>
-          : <div className="info-bar">🃏 Jokers placés : <strong>{jokers.length}/{jokerCount}</strong>{lockedJokers.length>0?` · ${lockedJokers.length} verrouillé${lockedJokers.length>1?"s":""}`:" · Cliquez pour déplacer"}</div>
+      {/* Banner jokers groupes */}
+      {!isKnockoutTab && groupJokerMax > 0 && (
+        groupRemaining > 0
+          ? <div className="info-bar">🃏 <strong>{groupRemaining} joker{groupRemaining>1?"s":""} groupes disponible{groupRemaining>1?"s":""}</strong> sur {groupJokerMax} — ×{pts.joker} sur un match !</div>
+          : <div className="info-bar">🃏 Jokers groupes : <strong>{groupJokers.length}/{groupJokerMax} placés</strong>{groupLockedJokers.length>0?` · ${groupLockedJokers.length} verrouillé${groupLockedJokers.length>1?"s":""}`:""}</div>
+      )}
+
+      {/* Banner joker finale */}
+      {isKnockoutTab && knockoutJokerMax > 0 && (
+        knockoutRemaining > 0
+          ? <div className="info-bar">⭐ <strong>Joker finale disponible</strong> — ×{pts.joker} sur un match de phase finale !</div>
+          : <div className="info-bar">⭐ Joker finale placé sur <strong>{allMatches.find(m=>m.id===knockoutJokers[0])?.home||"?"} – {allMatches.find(m=>m.id===knockoutJokers[0])?.away||"?"}</strong></div>
       )}
 
       {phaseTabs.length>0&&(
@@ -589,28 +623,26 @@ function PronosTab({ allMatches, myPreds, myJokers, officialScores, players, set
               <button key={t.key}
                 className={`phase-tab${activePhase===t.key?" active":""}${hasOpen?" has-open":""}`}
                 onClick={()=>setActivePhase(t.key)}
-              >
-                {t.label}
-                {hasOpen&&<span className="phase-tab-dot"/>}
-              </button>
+              >{t.label}{hasOpen&&<span className="phase-tab-dot"/>}</button>
             );
           })}
         </div>
       )}
 
-      {tabMatches.length===0?(
-        <div className="empty"><div className="empty-icon">📭</div><div className="empty-txt">Aucun match disponible dans cette phase.</div></div>
-      ):(
-        tabMatches.map(match=>(
+      {tabMatches.length===0
+        ? <div className="empty"><div className="empty-icon">📭</div><div className="empty-txt">Aucun match disponible dans cette phase.</div></div>
+        : tabMatches.map(match=>(
           <MatchCard key={match.id} match={match} pred={myPreds[match.id]}
-            onSave={onSave} myJokers={myJokers} jokerCount={jokerCount}
+            onSave={onSave} myJokers={myJokers}
+            groupJokerMax={groupJokerMax} knockoutJokerMax={knockoutJokerMax}
             onJokerToggle={onJoker} officialScore={officialScores[match.id]}
           />
         ))
-      )}
+      }
     </>
   );
 }
+
 
 // ═══════════════════════════════════════════════════════════════
 //  CompareTab
@@ -712,9 +744,15 @@ function CompareTab({ players, allPreds, allJokers, allWinnerPreds, allMatches, 
 // ═══════════════════════════════════════════════════════════════
 //  ClassementTab
 // ═══════════════════════════════════════════════════════════════
-function RankingList({ players, allPreds, allJokers, allWinnerPreds, officialScores, tw, pts, pts2, system }) {
+function RankingList({ players, allPreds, allJokers, allWinnerPreds, officialScores, tw, pts, pts2, system, allMatches, phaseCoefs }) {
   const P  = { ...DEFAULT_POINTS,   ...(pts||{}) };
   const P2 = { ...DEFAULT_POINTS_2, ...(pts2||{}) };
+
+  // Map matchId → phase pour les coefficients
+  const matchPhaseMap = {};
+  (allMatches||[]).forEach(m => {
+    matchPhaseMap[m.id] = m.group ? "Groupes" : (m.phase||"Groupes");
+  });
 
   const rankings = [...players].map(p => {
     const k = fKey(p);
@@ -722,10 +760,10 @@ function RankingList({ players, allPreds, allJokers, allWinnerPreds, officialSco
     const jIds   = normalizeJokers(allJokers[k]);
     const wPred  = allWinnerPreds[k]||null;
     if (system===2) {
-      const s = calcPoints2(preds, officialScores, jIds, wPred, tw, P2);
+      const s = calcPoints2(preds, officialScores, jIds, wPred, tw, P2, matchPhaseMap, phaseCoefs);
       return { name:p, wPred, ...s };
     }
-    const s = calcPoints(preds, officialScores, jIds, wPred, tw, P);
+    const s = calcPoints(preds, officialScores, jIds, wPred, tw, P, matchPhaseMap, phaseCoefs);
     return { name:p, wPred, ...s };
   }).sort((a,b)=>b.total-a.total);
 
@@ -768,12 +806,13 @@ function RankingList({ players, allPreds, allJokers, allWinnerPreds, officialSco
   );
 }
 
-function ClassementTab({ players, allPreds, allJokers, allWinnerPreds, officialScores, settings }) {
+function ClassementTab({ players, allPreds, allJokers, allWinnerPreds, officialScores, settings, allMatches }) {
   const hasScores = Object.keys(officialScores||{}).length>0;
   const tw  = settings.tournamentWinner||"";
   const pts  = { ...DEFAULT_POINTS,   ...(settings.points||{}) };
   const pts2 = { ...DEFAULT_POINTS_2, ...(settings.points2||{}) };
-  const display = settings.scoringDisplay||"s1"; // "s1" | "s2" | "both"
+  const phaseCoefs = { ...DEFAULT_PHASE_COEFS, ...(settings.phaseCoefs||{}) };
+  const display = settings.scoringDisplay||"s1";
 
   const [activeSystem, setActiveSystem] = useState(display==="s2"?2:1);
 
@@ -788,35 +827,22 @@ function ClassementTab({ players, allPreds, allJokers, allWinnerPreds, officialS
     <>
       {tw&&<div className="winner-banner">🏆 Vainqueur officiel : <strong>{tw}</strong></div>}
 
-      {/* Sélecteur de système si "les deux" */}
       {showBoth&&(
         <div className="phase-tabs-wrap" style={{marginBottom:16}}>
-          <button className={`phase-tab${activeSystem===1?" active":""}`} onClick={()=>setActiveSystem(1)}>
-            ⭐ Système 1
-          </button>
-          <button className={`phase-tab${activeSystem===2?" active":""}`} onClick={()=>setActiveSystem(2)}>
-            🔢 Système 2
-          </button>
+          <button className={`phase-tab${activeSystem===1?" active":""}`} onClick={()=>setActiveSystem(1)}>⭐ Système 1</button>
+          <button className={`phase-tab${activeSystem===2?" active":""}`} onClick={()=>setActiveSystem(2)}>🔢 Système 2</button>
         </div>
       )}
-
-      {/* Label du système affiché */}
-      {display!=="both"&&(
-        <div style={{fontSize:11,color:"#4E5E84",fontWeight:700,textTransform:"uppercase",letterSpacing:.7,marginBottom:12}}>
-          {display==="s1"?"⭐ Système 1 — Score exact / Bon résultat":"🔢 Système 2 — Vainqueur + buts individuels + différence"}
-        </div>
-      )}
-      {display==="both"&&(
-        <div style={{fontSize:11,color:"#4E5E84",fontWeight:700,textTransform:"uppercase",letterSpacing:.7,marginBottom:12}}>
-          {activeSystem===1?"⭐ Système 1 — Score exact / Bon résultat":"🔢 Système 2 — Vainqueur + buts individuels + différence"}
-        </div>
-      )}
+      <div style={{fontSize:11,color:"#4E5E84",fontWeight:700,textTransform:"uppercase",letterSpacing:.7,marginBottom:12}}>
+        {(showBoth?activeSystem===1:display==="s1")?"⭐ Système 1 — Score exact / Bon résultat":"🔢 Système 2 — Vainqueur + buts individuels + différence"}
+      </div>
 
       <RankingList
         players={players} allPreds={allPreds} allJokers={allJokers}
         allWinnerPreds={allWinnerPreds} officialScores={officialScores}
         tw={tw} pts={pts} pts2={pts2}
         system={showBoth ? activeSystem : (display==="s2" ? 2 : 1)}
+        allMatches={allMatches} phaseCoefs={phaseCoefs}
       />
     </>
   );
@@ -872,13 +898,15 @@ function CagnotteTab({ players, cagnotteSettings, paidPlayers, username }) {
 // ═══════════════════════════════════════════════════════════════
 function AdminPanel({ settings, officialScores, extraMatches, players, paidPlayers, onClose,
   onToggleShowPreds, onSetTournamentWinner, onSaveScore, onDeleteScore, onSavePoints, onSavePoints2,
-  onScoringDisplay, onSaveJokerCount, onAddMatch, onDeleteMatch, onSaveCagnotte, onTogglePaid, onToggleHideMatch }) {
+  onScoringDisplay, onSaveGroupJokerCount, onSaveKnockoutJokerCount, onSavePhaseCoefs,
+  onAddMatch, onDeleteMatch, onSaveCagnotte, onTogglePaid, onToggleHideMatch }) {
 
   const [localScores, setLocalScores] = useState({});
   const [savedIds,    setSavedIds]    = useState({});
   const [winnerVal,   setWinnerVal]   = useState(settings.tournamentWinner||"");
   const [pts,         setPts]         = useState({ ...DEFAULT_POINTS,   ...(settings.points||{}) });
   const [pts2,        setPts2]        = useState({ ...DEFAULT_POINTS_2, ...(settings.points2||{}) });
+  const [localCoefs,  setLocalCoefs]  = useState({ ...DEFAULT_PHASE_COEFS, ...(settings.phaseCoefs||{}) });
   // Cagnotte
   const [cAmount,  setCAmount]  = useState(settings.cagnotte?.amount || 2);
   const [cMethod,  setCMethod]  = useState(settings.cagnotte?.method || "");
@@ -948,11 +976,19 @@ function AdminPanel({ settings, officialScores, extraMatches, players, paidPlaye
             </button>
           </div>
           <div className="toggle-row" style={{marginTop:10}}>
-            <span className="toggle-label">Nombre de jokers par joueur</span>
+            <span className="toggle-label">Jokers phase de groupes</span>
             <input type="number" min="0" max="10"
               style={{width:52,background:"#141E36",border:"1px solid #1B2A47",borderRadius:8,color:"#F5C842",fontFamily:"'Bebas Neue',sans-serif",fontSize:22,textAlign:"center",padding:"3px 4px"}}
-              defaultValue={settings.jokerCount??1}
-              onBlur={e=>onSaveJokerCount(Number(e.target.value))}
+              defaultValue={settings.groupJokerCount ?? DEFAULT_GROUP_JOKER_COUNT}
+              onBlur={e=>onSaveGroupJokerCount(Number(e.target.value))}
+            />
+          </div>
+          <div className="toggle-row" style={{marginTop:8}}>
+            <span className="toggle-label">Joker phase finale</span>
+            <input type="number" min="0" max="5"
+              style={{width:52,background:"#141E36",border:"1px solid #1B2A47",borderRadius:8,color:"#F5C842",fontFamily:"'Bebas Neue',sans-serif",fontSize:22,textAlign:"center",padding:"3px 4px"}}
+              defaultValue={settings.knockoutJokerCount ?? DEFAULT_KNOCKOUT_JOKER_COUNT}
+              onBlur={e=>onSaveKnockoutJokerCount(Number(e.target.value))}
             />
           </div>
         </div>
@@ -1002,6 +1038,38 @@ function AdminPanel({ settings, officialScores, extraMatches, players, paidPlaye
             ))}
           </div>
         </div>
+
+        {/* Coefficients par phase */}
+        {(()=>{
+          const allPhases = ["Groupes", ...new Set(extraMatches.filter(m=>m.phase).map(m=>m.phase))];
+          return (
+            <div className="admin-section">
+              <div className="admin-sec-title">⚖️ Coefficients par phase</div>
+              <p style={{fontSize:11,color:"#4E5E84",marginBottom:10}}>
+                Multiplie les points de chaque match selon sa phase, puis arrondit.<br/>
+                Ex : 4 pts × 1.2 → 5 pts. S'applique aux deux systèmes.
+              </p>
+              {allPhases.map(phase=>{
+                const val = localCoefs[phase] ?? 1;
+                return (
+                  <div key={phase} className="admin-match-row">
+                    <span className="admin-match-name" style={{color:"#D0DCFF",fontWeight:600}}>{phase}</span>
+                    <span className="adm-sep" style={{color:"#4E5E84",fontSize:11}}>×</span>
+                    <input type="number" step="0.1" min="0.1" max="10"
+                      className="adm-in" style={{width:58,fontSize:16}}
+                      value={val}
+                      onChange={e=>setLocalCoefs(p=>({...p,[phase]:Number(e.target.value)}))}
+                      onBlur={()=>onSavePhaseCoefs(localCoefs)}
+                    />
+                  </div>
+                );
+              })}
+              <p style={{fontSize:10,color:"#3D5070",marginTop:8}}>
+                Les phases finales apparaissent ici dès que vous ajoutez des matchs ci-dessous.
+              </p>
+            </div>
+          );
+        })()}
 
         {/* Affichage du classement */}
         <div className="admin-section">
@@ -1246,12 +1314,40 @@ export default function App() {
     showToast("✓ Prono enregistré");
   }
 
-  async function saveJoker(jokerArray) {
+  async function saveJoker(jokerArray, auto=false) {
     setMyJokers(jokerArray);
     const obj = jokerArray.length>0 ? Object.fromEntries(jokerArray.map(id=>[id,true])) : null;
     await set(ref(db,jPath(username)), obj);
-    if (jokerArray.length > (myJokers?.length||0)) showToast("🃏 Joker placé !");
+    if (auto) showToast("🃏 Jokers auto-placés sur les derniers matchs !");
+    else if (jokerArray.length > (myJokers?.length||0)) showToast("🃏 Joker placé !");
   }
+
+  // ── Auto-placement des jokers groupes en fin de phase ────────
+  useEffect(()=>{
+    if (!username || !firebaseOK) return;
+    const groupJokerMax = settings.groupJokerCount ?? DEFAULT_GROUP_JOKER_COUNT;
+    const placedGroup   = myJokers.filter(isGroupMatch);
+    const unplaced      = groupJokerMax - placedGroup.length;
+    if (unplaced <= 0) return;
+
+    // Matchs de groupe encore ouverts sans joker, triés du plus tardif au plus tôt
+    const available = BASE_MATCHES
+      .filter(m => !isLocked(m.kickoff) && !placedGroup.includes(m.id))
+      .sort((a,b) => new Date(b.kickoff) - new Date(a.kickoff));
+
+    if (available.length === 0 || available.length > unplaced + 1) return;
+
+    // Auto-placer sur les derniers matchs disponibles
+    const toPlace   = available.slice(0, unplaced).map(m => m.id);
+    const kJokers   = myJokers.filter(id => !isGroupMatch(id));
+    const newJokers = [...new Set([...placedGroup, ...toPlace, ...kJokers])];
+
+    const changed = newJokers.length !== myJokers.length
+      || newJokers.some(id => !myJokers.includes(id));
+    if (changed) saveJoker(newJokers, true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify([...myJokers].sort()), settings.groupJokerCount,
+      BASE_MATCHES.filter(m=>isLocked(m.kickoff)).length]);
 
   async function saveWinnerPred(team) {
     setMyWinnerPred(team); setShowWinnerModal(false);
@@ -1271,10 +1367,12 @@ export default function App() {
     await update(ref(db,`${APP}/settings`),changes);
   }
 
-  const savePoints         = pts  => saveSettings({points:pts});
-  const savePoints2        = pts2 => saveSettings({points2:pts2});
-  const saveScoringDisplay = v    => saveSettings({scoringDisplay:v});
-  const saveJokerCount     = n    => saveSettings({jokerCount:n});
+  const savePoints            = pts  => saveSettings({points:pts});
+  const savePoints2           = pts2 => saveSettings({points2:pts2});
+  const saveScoringDisplay    = v    => saveSettings({scoringDisplay:v});
+  const saveGroupJokerCount   = n    => saveSettings({groupJokerCount:n});
+  const saveKnockoutJokerCount = n   => saveSettings({knockoutJokerCount:n});
+  const savePhaseCoefs        = c    => saveSettings({phaseCoefs:c});
 
   async function addExtraMatch(data) {
     const id="E"+Date.now();
@@ -1365,7 +1463,9 @@ export default function App() {
             onSavePoints={savePoints}
             onSavePoints2={savePoints2}
             onScoringDisplay={saveScoringDisplay}
-            onSaveJokerCount={saveJokerCount}
+            onSaveGroupJokerCount={saveGroupJokerCount}
+            onSaveKnockoutJokerCount={saveKnockoutJokerCount}
+            onSavePhaseCoefs={savePhaseCoefs}
             onAddMatch={addExtraMatch} onDeleteMatch={deleteExtraMatch}
             onSaveCagnotte={saveCagnotte} onTogglePaid={togglePaid}
             onToggleHideMatch={toggleHideMatch}
@@ -1421,7 +1521,8 @@ export default function App() {
           )}
           {activeTab==="classement"&&(
             <ClassementTab players={players} allPreds={allPreds} allJokers={allJokers}
-              allWinnerPreds={allWinnerPreds} officialScores={officialScores} settings={settings}
+              allWinnerPreds={allWinnerPreds} officialScores={officialScores}
+              settings={settings} allMatches={allMatches}
             />
           )}
           {activeTab==="cagnotte"&&(
