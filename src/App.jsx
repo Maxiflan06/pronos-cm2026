@@ -1056,16 +1056,19 @@ function AdminPanel({ settings, officialScores, extraMatches, players, paidPlaye
                   <div key={phase} className="admin-match-row">
                     <span className="admin-match-name" style={{color:"#D0DCFF",fontWeight:600}}>{phase}</span>
                     <span className="adm-sep" style={{color:"#4E5E84",fontSize:11}}>×</span>
-                    <input type="number" step="0.1" min="0.1" max="10"
-                      className="adm-in" style={{width:58,fontSize:16}}
-                      value={val}
-                      onChange={e => {
-                        const v = parseFloat(e.target.value);
-                        if (!isNaN(v)) setLocalCoefs(p=>({...p,[phase]:v}));
-                      }}
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      className="adm-in"
+                      style={{width:58,fontSize:15,textAlign:"center"}}
+                      key={`${phase}-${val}`}
+                      defaultValue={String(val).replace('.',',')}
                       onBlur={e => {
-                        const v = parseFloat(e.target.value) || 1;
-                        const updated = { ...localCoefs, [phase]: v };
+                        const raw = e.target.value.trim().replace(',','.');
+                        const parsed = parseFloat(raw);
+                        const finalVal = (!isNaN(parsed) && parsed > 0) ? parsed : 1;
+                        e.target.value = String(finalVal).replace('.',',');
+                        const updated = { ...localCoefs, [phase]: finalVal };
                         setLocalCoefs(updated);
                         onSavePhaseCoefs(updated);
                       }}
