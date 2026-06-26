@@ -1008,8 +1008,8 @@ function AdminPanel({ settings, officialScores, extraMatches, players, paidPlaye
                 <span className="pts-lbl">{label}</span>
                 <input type="number" min="0" max="50" className="pts-in"
                   value={pts[key]}
-                  onChange={e=>setPts(p=>({...p,[key]:Number(e.target.value)}))}
-                  onBlur={()=>onSavePoints(pts)}
+                  onChange={e=>{ const v=Number(e.target.value); if(!isNaN(v)) setPts(p=>({...p,[key]:v})); }}
+                  onBlur={e=>{ const updated={...pts,[key]:Number(e.target.value)||0}; setPts(updated); onSavePoints(updated); }}
                 />
               </div>
             ))}
@@ -1032,8 +1032,8 @@ function AdminPanel({ settings, officialScores, extraMatches, players, paidPlaye
                 <span className="pts-lbl">{label}</span>
                 <input type="number" min="0" max="50" className="pts-in"
                   value={pts2[key]}
-                  onChange={e=>setPts2(p=>({...p,[key]:Number(e.target.value)}))}
-                  onBlur={()=>onSavePoints2(pts2)}
+                  onChange={e=>{ const v=Number(e.target.value); if(!isNaN(v)) setPts2(p=>({...p,[key]:v})); }}
+                  onBlur={e=>{ const updated={...pts2,[key]:Number(e.target.value)||0}; setPts2(updated); onSavePoints2(updated); }}
                 />
               </div>
             ))}
@@ -1059,8 +1059,16 @@ function AdminPanel({ settings, officialScores, extraMatches, players, paidPlaye
                     <input type="number" step="0.1" min="0.1" max="10"
                       className="adm-in" style={{width:58,fontSize:16}}
                       value={val}
-                      onChange={e=>setLocalCoefs(p=>({...p,[phase]:Number(e.target.value)}))}
-                      onBlur={()=>onSavePhaseCoefs(localCoefs)}
+                      onChange={e => {
+                        const v = parseFloat(e.target.value);
+                        if (!isNaN(v)) setLocalCoefs(p=>({...p,[phase]:v}));
+                      }}
+                      onBlur={e => {
+                        const v = parseFloat(e.target.value) || 1;
+                        const updated = { ...localCoefs, [phase]: v };
+                        setLocalCoefs(updated);
+                        onSavePhaseCoefs(updated);
+                      }}
                     />
                   </div>
                 );
