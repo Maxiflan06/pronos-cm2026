@@ -162,7 +162,7 @@ function calcPoints(preds, scores, jokerMatchIds, winnerPred, tournamentWinner, 
     let p=0;
     if (pred.home===s.home&&pred.away===s.away) { p=P.exact; exact++; }
     else if (Math.sign(pred.home-pred.away)===Math.sign(s.home-s.away)) { p=P.result; result++; }
-    const coef = coefs[matchPhaseMap?.[id] ?? "Groupes"] ?? 1;
+    const coef = coefs[fKey(matchPhaseMap?.[id] ?? "Groupes")] ?? 1;
     if (coef!==1) p = Math.round(p*coef);
     if (jIds.includes(id)) { jokerBonus+=p; p=Math.round(p*P.joker); }
     total+=p;
@@ -186,7 +186,7 @@ function calcPoints2(preds, scores, jokerMatchIds, winnerPred, tournamentWinner,
     if (pred.home===s.home) { p+=P.exactHome; homeCount++; }
     if (pred.away===s.away) { p+=P.exactAway; awayCount++; }
     if ((pred.home-pred.away)===(s.home-s.away)) { p+=P.exactDiff; diffCount++; }
-    const coef = coefs[matchPhaseMap?.[id] ?? "Groupes"] ?? 1;
+    const coef = coefs[fKey(matchPhaseMap?.[id] ?? "Groupes")] ?? 1;
     if (coef!==1) p = Math.round(p*coef);
     if (jIds.includes(id)) { jokerBonus+=p; p=Math.round(p*P.joker); }
     total+=p;
@@ -1051,7 +1051,7 @@ function AdminPanel({ settings, officialScores, extraMatches, players, paidPlaye
                 Ex : 4 pts × 1.2 → 5 pts. S'applique aux deux systèmes.
               </p>
               {allPhases.map(phase=>{
-                const val = localCoefs[phase] ?? 1;
+                const val = localCoefs[fKey(phase)] ?? 1;
                 return (
                   <div key={phase} className="admin-match-row">
                     <span className="admin-match-name" style={{color:"#D0DCFF",fontWeight:600}}>{phase}</span>
@@ -1068,7 +1068,7 @@ function AdminPanel({ settings, officialScores, extraMatches, players, paidPlaye
                         const parsed = parseFloat(raw);
                         const finalVal = (!isNaN(parsed) && parsed > 0) ? parsed : 1;
                         e.target.value = String(finalVal).replace('.',',');
-                        const updated = { ...localCoefs, [phase]: finalVal };
+                        const updated = { ...localCoefs, [fKey(phase)]: finalVal };
                         setLocalCoefs(updated);
                         onSavePhaseCoefs(updated);
                       }}
