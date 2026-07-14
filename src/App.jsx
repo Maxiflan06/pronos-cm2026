@@ -649,8 +649,9 @@ function PronosTab({ allMatches, myPreds, myJokers, officialScores, players, set
 //  CompareTab
 // ═══════════════════════════════════════════════════════════════
 function CompareTab({ players, allPreds, allJokers, allWinnerPreds, allMatches, officialScores, username, settings }) {
-  const showAll = settings.showAllPreds!==false;
-  const cols = showAll ? players : players.filter(p=>p===username);
+  // Tous les joueurs sont toujours affichés en colonnes.
+  // Les pronos des AUTRES joueurs sont masqués tant que le match n'a pas commencé.
+  const cols = players;
 
   // Filtres groupe/phase
   const groups = [...new Set(allMatches.filter(m=>m.group).map(m=>m.group))].sort();
@@ -684,7 +685,7 @@ function CompareTab({ players, allPreds, allJokers, allWinnerPreds, allMatches, 
       <div className="players-chips">
         {players.map(p=><span key={p} className={`p-chip${p===username?" me":""}`}>{p===username?"👤 ":""}{p}</span>)}
       </div>
-      {!showAll&&<div className="hidden-notice">🔒 L'admin a masqué les pronos des autres</div>}
+      <div className="hidden-notice">🔒 Pronos des autres joueurs masqués jusqu'au coup d'envoi</div>
 
       {/* Filtre par groupe */}
       <div className="phase-tabs-wrap" style={{marginBottom:12}}>
@@ -704,14 +705,14 @@ function CompareTab({ players, allPreds, allJokers, allWinnerPreds, allMatches, 
           </tr></thead>
           <tbody>
             {filteredMatches.map(match=>{
-              const open=!isLocked(match.kickoff);
-              const official=officialScores[match.id];
+              const started = isLocked(match.kickoff);
+              const official = officialScores[match.id];
               return (
                 <tr key={match.id}>
                   <td className="mc">
                     {match.group&&<span style={{fontSize:9,color:"#3D5070",marginRight:4,fontWeight:700}}>Gr.{match.group}</span>}
                     {match.home} – {match.away}
-                    {open&&!official&&<span className="open-dot"/>}
+                    {!started&&!official&&<span className="open-dot"/>}
                     {official&&(
                       <span style={{
                         display:"inline-block",marginLeft:6,
@@ -722,11 +723,21 @@ function CompareTab({ players, allPreds, allJokers, allWinnerPreds, allMatches, 
                     )}
                   </td>
                   {cols.map(p=>{
-                    const pred=allPreds[fKey(p)]?.[match.id];
-                    const isJ=normalizeJokers(allJokers[fKey(p)]).includes(match.id);
-                    return <td key={p}>{pred!=null
-                      ?<span className={`pred-val${isJ?" joker-pred":""}`}>{isJ?"🃏 ":""}{pred.home}–{pred.away}</span>
-                      :<span className="no-pred">—</span>}</td>;
+                    const pred   = allPreds[fKey(p)]?.[match.id];
+                    const isJ    = normalizeJokers(allJokers[fKey(p)]).includes(match.id);
+                    const isMe   = p === username;
+                    // Visible si : match commencé OU c'est mon propre prono
+                    const visible = started || isMe;
+                    return (
+                      <td key={p}>
+                        {!visible
+                          ? <span style={{color:"#2C3E5A",fontSize:13}}>🔒</span>
+                          : pred != null
+                            ? <span className={`pred-val${isJ?" joker-pred":""}`}>{isJ?"🃏 ":""}{pred.home}–{pred.away}</span>
+                            : <span className="no-pred">—</span>
+                        }
+                      </td>
+                    );
                   })}
                 </tr>
               );
@@ -969,13 +980,9 @@ function AdminPanel({ settings, officialScores, extraMatches, players, paidPlaye
         {/* Paramètres généraux */}
         <div className="admin-section">
           <div className="admin-sec-title">Paramètres</div>
-          <div className="toggle-row">
-            <span className="toggle-label">Afficher les pronos de tous</span>
-            <button className={`toggle-btn${settings.showAllPreds!==false?" on":" off"}`}
-              onClick={()=>onToggleShowPreds(settings.showAllPreds===false)}>
-              <span className="toggle-thumb"/>
-            </button>
-          </div>
+          <p style={{fontSize:11,color:"#4E5E84",marginBottom:8,fontStyle:"italic"}}>
+            Les pronos des autres joueurs sont automatiquement masqués jusqu'au coup d'envoi de chaque match.
+          </p>
           <div className="toggle-row" style={{marginTop:10}}>
             <span className="toggle-label">Jokers phase de groupes</span>
             <input type="number" min="0" max="10"
