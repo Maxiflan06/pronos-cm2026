@@ -905,7 +905,9 @@ function StatistiquesTab({ players, allPreds, allJokers, officialScores, setting
       const match=allMatches.find(m=>m.id===mid);
       if(pts>bestPts){bestPts=pts;bestMatch=match?`${match.home}–${match.away}`:"?";}
     }
-    return{total,exact,winner,homeOk,awayOk,diffOk,ptsWinner,ptsHome,ptsAway,ptsDiff,ptsExact,ptsJoker,pronos,missing,bestPts,bestMatch};
+    return{total,exact,winner,homeOk,awayOk,diffOk,
+      butsTotal:homeOk+awayOk,ptsButsTotal:ptsHome+ptsAway,
+      ptsWinner,ptsHome,ptsAway,ptsDiff,ptsExact,ptsJoker,pronos,missing,bestPts,bestMatch};
   }
 
   const allStats = players.map(p=>({name:p,...playerStats(p)}));
@@ -960,10 +962,9 @@ function StatistiquesTab({ players, allPreds, allJokers, officialScores, setting
             <thead><tr>
               <th className="sc">Joueur</th>
               <th>Total pts</th>
-              <th>Pronos</th>
               <th>% vainqueur</th>
               <th>Scores exacts</th>
-              <th>Meilleur match</th>
+              <th style={{minWidth:140}}>Meilleur match</th>
             </tr></thead>
             <tbody>
               {ranked.map((r,i)=>(
@@ -972,11 +973,10 @@ function StatistiquesTab({ players, allPreds, allJokers, officialScores, setting
                     {i===0?"🥇":i===1?"🥈":i===2?"🥉":`#${i+1}`} {r.name}
                   </td>
                   <td><span className="sv">{r.total}</span></td>
-                  <td><span className="sv">{r.pronos}<span className="sv-sub">/{r.pronos+r.missing}</span></span></td>
                   <td><span className="sv">{r.pronos?Math.round(r.winner/r.pronos*100):0}%</span></td>
                   <td><span className="sv hi">{r.exact}</span></td>
-                  <td style={{fontSize:10,color:"#8A9AC0",maxWidth:100,overflow:"hidden",textOverflow:"ellipsis"}}>
-                    {r.bestPts>0?`${r.bestMatch} (${r.bestPts}pts)`:"–"}
+                  <td style={{fontSize:10,color:"#8A9AC0",textAlign:"left",whiteSpace:"normal",wordBreak:"break-word",maxWidth:160}}>
+                    {r.bestPts>0?`${r.bestMatch} (${r.bestPts} pts)`:"–"}
                   </td>
                 </tr>
               ))}
@@ -996,8 +996,7 @@ function StatistiquesTab({ players, allPreds, allJokers, officialScores, setting
             <tbody>
               {[
                 {label:"✅ Vainqueurs/nuls",cnt:"winner",pts:"ptsWinner"},
-                {label:"1️⃣ Buts dom. exacts",cnt:"homeOk",pts:"ptsHome"},
-                {label:"2️⃣ Buts ext. exacts",cnt:"awayOk",pts:"ptsAway"},
+                {label:"⚽ Buts exacts (dom. + ext.)",cnt:"butsTotal",pts:"ptsButsTotal"},
                 {label:"↔ Diff. exacte",cnt:"diffOk",pts:"ptsDiff"},
                 {label:"⭐ Score exact complet",cnt:"exact",pts:"ptsExact"},
                 {label:"🃏 Bonus joker (pts)",cnt:null,pts:"ptsJoker"},
@@ -1023,8 +1022,7 @@ function StatistiquesTab({ players, allPreds, allJokers, officialScores, setting
           {[
             {icon:"⭐",label:"Plus de scores exacts",key:"exact",unit:"scores exacts"},
             {icon:"✅",label:"Plus de bons vainqueurs",key:"winner",unit:"bons résultats"},
-            {icon:"1️⃣",label:"Plus de buts dom. exacts",key:"homeOk",unit:"× buts dom."},
-            {icon:"2️⃣",label:"Plus de buts ext. exacts",key:"awayOk",unit:"× buts ext."},
+            {icon:"⚽",label:"Plus de buts exacts (dom. + ext.)",key:"butsTotal",unit:"× buts exacts"},
             {icon:"↔",label:"Plus de diff. exactes",key:"diffOk",unit:"× diff."},
             {icon:"⚡",label:"Meilleure perf. sur 1 match",key:"bestPts",unit:"pts"},
           ].map(item=>{
