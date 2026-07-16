@@ -861,6 +861,192 @@ function ClassementTab({ players, allPreds, allJokers, allWinnerPreds, officialS
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  StatistiquesTab
+// ═══════════════════════════════════════════════════════════════
+function StatistiquesTab({ players, allPreds, allJokers, officialScores, settings, allMatches }) {
+  const pts2      = { ...DEFAULT_POINTS_2, ...(settings.points2||{}) };
+  const phaseCoefs = { ...DEFAULT_PHASE_COEFS, ...(settings.phaseCoefs||{}) };
+
+  if (!Object.keys(officialScores||{}).length) return (
+    <div className="empty"><div className="empty-icon">⏳</div>
+    <div className="empty-txt">Les statistiques apparaîtront dès<br/>que des scores officiels sont saisis.</div></div>
+  );
+
+  // ── Calcul des stats par joueur ───────────────────────────────
+  const matchPhaseMap = {};
+  (allMatches||[]).forEach(m => { matchPhaseMap[m.id]=m.group?"Groupes":(m.phase||"Groupes"); });
+
+  function playerStats(playerName) {
+    const preds  = allPreds[fKey(playerName)]||{};
+    const jIds   = normalizeJokers(allJokers[fKey(playerName)]);
+    let exact=0, winner=0, homeOk=0, awayOk=0, diffOk=0;
+    let ptsWinner=0, ptsHome=0, ptsAway=0, ptsDiff=0, ptsExact=0, ptsJoker=0;
+    let total=0, pronos=0, missing=0, bestPts=0, bestMatch="";
+
+    for (const [mid, pred] of Object.entries(preds)) {
+      const s = officialScores[mid];
+      if (!s||pred.home==null||pred.away==null) { if(!s) missing++; continue; }
+      pronos++;
+      const ph   = matchPhaseMap[mid]||"Groupes";
+      const coef = phaseCoefs[fKey(ph)]??1;
+      let b=0;
+      const win=(Math.sign(pred.home-pred.away)===Math.sign(s.home-s.away));
+      const hm=(pred.home===s.home), aw=(pred.away===s.away), df=((pred.home-pred.away)===(s.home-s.away));
+      if(win){b+=pts2.winner;winner++;ptsWinner+=Math.round(pts2.winner*coef);}
+      if(hm) {b+=pts2.exactHome;homeOk++;ptsHome+=Math.round(pts2.exactHome*coef);}
+      if(aw) {b+=pts2.exactAway;awayOk++;ptsAway+=Math.round(pts2.exactAway*coef);}
+      if(df) {b+=pts2.exactDiff;diffOk++;ptsDiff+=Math.round(pts2.exactDiff*coef);}
+      if(hm&&aw){exact++;ptsExact+=Math.round(6*coef);}
+      const bc=Math.round(b*coef);
+      const isJ=jIds.includes(mid);
+      if(isJ){ptsJoker+=bc; total+=Math.round(bc*pts2.joker);}
+      else   {total+=bc;}
+      const pts=isJ?Math.round(bc*pts2.joker):bc;
+      const match=allMatches.find(m=>m.id===mid);
+      if(pts>bestPts){bestPts=pts;bestMatch=match?`${match.home}–${match.away}`:"?";}
+    }
+    return{total,exact,winner,homeOk,awayOk,diffOk,ptsWinner,ptsHome,ptsAway,ptsDiff,ptsExact,ptsJoker,pronos,missing,bestPts,bestMatch};
+  }
+
+  const allStats = players.map(p=>({name:p,...playerStats(p)}));
+  const ranked   = [...allStats].sort((a,b)=>b.total-a.total);
+  const total    = allStats[0]?.pronos||0;
+
+  const [view, setView] = useState("vue");
+  const views=[
+    {key:"vue",   label:"Résumé"},
+    {key:"comp",  label:"Composantes"},
+    {key:"palm",  label:"🥇 Palmarès"},
+  ];
+
+  // ── CSS additionnel stats ─────────────────────────────────────
+  const extraCSS=`
+.stats-scroll{overflow-x:auto;border-radius:12px;border:1px solid #1B2A47;margin-top:4px;}
+.stats-table{width:100%;border-collapse:collapse;font-size:11px;}
+.stats-table th{background:#0F182C;padding:7px 10px;color:#4E5E84;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #1B2A47;white-space:nowrap;position:sticky;top:0;z-index:2;}
+.stats-table th.sc{text-align:left;position:sticky;left:0;z-index:3;background:#0F182C;min-width:160px;}
+.stats-table td{padding:7px 10px;border-bottom:1px solid rgba(27,42,71,.4);text-align:center;white-space:nowrap;}
+.stats-table td.sc{text-align:left;position:sticky;left:0;background:#0D1425;font-weight:600;font-size:11px;color:#8A9AC0;}
+.stats-table tr:nth-child(even) td{background:rgba(255,255,255,.015);}
+.stats-table tr:nth-child(even) td.sc{background:#0E1629;}
+.sv{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1px;color:#F5C842;}
+.sv.hi{color:#4ADE80;} .sv.lo{color:#F87171;} .sv.jok{color:#FFD700;}
+.sv.pts{font-size:11px;color:#8A9AC0;}
+.palm-card{background:linear-gradient(135deg,#0F182C,#121B30);border:1px solid #1B2A47;border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;}
+.palm-icon{font-size:20px;flex-shrink:0;}
+.palm-info{flex:1;min-width:0;}
+.palm-label{font-size:11px;color:#4E5E84;font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+.palm-winner{font-size:14px;font-weight:700;color:#D0DCFF;margin-top:2px;}
+.palm-val{font-family:'Bebas Neue',sans-serif;font-size:26px;color:#F5C842;flex-shrink:0;letter-spacing:1px;}
+.sv-sub{font-size:9px;color:#3D5070;display:block;}
+`;
+
+  return (
+    <>
+      <style>{extraCSS}</style>
+
+      {/* Vue tabs */}
+      <div className="phase-tabs-wrap" style={{marginBottom:12}}>
+        {views.map(v=>(
+          <button key={v.key} className={`phase-tab${view===v.key?" active":""}`}
+            onClick={()=>setView(v.key)}>{v.label}</button>
+        ))}
+      </div>
+
+      {/* ── Résumé ── */}
+      {view==="vue"&&(
+        <div className="stats-scroll">
+          <table className="stats-table">
+            <thead><tr>
+              <th className="sc">Joueur</th>
+              <th>Total pts</th>
+              <th>Pronos</th>
+              <th>% vainqueur</th>
+              <th>Scores exacts</th>
+              <th>Meilleur match</th>
+            </tr></thead>
+            <tbody>
+              {ranked.map((r,i)=>(
+                <tr key={r.name}>
+                  <td className="sc">
+                    {i===0?"🥇":i===1?"🥈":i===2?"🥉":`#${i+1}`} {r.name}
+                  </td>
+                  <td><span className="sv">{r.total}</span></td>
+                  <td><span className="sv">{r.pronos}<span className="sv-sub">/{r.pronos+r.missing}</span></span></td>
+                  <td><span className="sv">{r.pronos?Math.round(r.winner/r.pronos*100):0}%</span></td>
+                  <td><span className="sv hi">{r.exact}</span></td>
+                  <td style={{fontSize:10,color:"#8A9AC0",maxWidth:100,overflow:"hidden",textOverflow:"ellipsis"}}>
+                    {r.bestPts>0?`${r.bestMatch} (${r.bestPts}pts)`:"–"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ── Composantes ── */}
+      {view==="comp"&&(
+        <div className="stats-scroll">
+          <table className="stats-table">
+            <thead><tr>
+              <th className="sc">Critère (pts gagnés)</th>
+              {ranked.map(r=><th key={r.name}>{r.name.split(" ")[0]}</th>)}
+            </tr></thead>
+            <tbody>
+              {[
+                {label:"✅ Vainqueurs/nuls",cnt:"winner",pts:"ptsWinner"},
+                {label:"1️⃣ Buts dom. exacts",cnt:"homeOk",pts:"ptsHome"},
+                {label:"2️⃣ Buts ext. exacts",cnt:"awayOk",pts:"ptsAway"},
+                {label:"↔ Diff. exacte",cnt:"diffOk",pts:"ptsDiff"},
+                {label:"⭐ Score exact complet",cnt:"exact",pts:"ptsExact"},
+                {label:"🃏 Bonus joker (pts)",cnt:null,pts:"ptsJoker"},
+              ].map(row=>(
+                <tr key={row.label}>
+                  <td className="sc">{row.label}</td>
+                  {ranked.map(r=>(
+                    <td key={r.name}>
+                      {row.cnt&&<span className="sv">{r[row.cnt]}<span className="sv-sub">{r[row.pts]}pts</span></span>}
+                      {!row.cnt&&<span className="sv jok">+{r[row.pts]}</span>}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ── Palmarès ── */}
+      {view==="palm"&&(
+        <>
+          {[
+            {icon:"⭐",label:"Plus de scores exacts",key:"exact",unit:"scores exacts"},
+            {icon:"✅",label:"Plus de bons vainqueurs",key:"winner",unit:"bons résultats"},
+            {icon:"1️⃣",label:"Plus de buts dom. exacts",key:"homeOk",unit:"× buts dom."},
+            {icon:"2️⃣",label:"Plus de buts ext. exacts",key:"awayOk",unit:"× buts ext."},
+            {icon:"↔",label:"Plus de diff. exactes",key:"diffOk",unit:"× diff."},
+            {icon:"⚡",label:"Meilleure perf. sur 1 match",key:"bestPts",unit:"pts"},
+          ].map(item=>{
+            const winner=ranked.reduce((a,b)=>b[item.key]>a[item.key]?b:a);
+            return(
+              <div key={item.key} className="palm-card">
+                <span className="palm-icon">{item.icon}</span>
+                <div className="palm-info">
+                  <div className="palm-label">{item.label}</div>
+                  <div className="palm-winner">🏆 {winner.name}</div>
+                </div>
+                <div className="palm-val">{winner[item.key]}<span className="sv-sub" style={{color:"#4E5E84",fontSize:10}}>{item.unit}</span></div>
+              </div>
+            );
+          })}
+        </>
+      )}
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  CagnotteTab
 // ═══════════════════════════════════════════════════════════════
 function CagnotteTab({ players, cagnotteSettings, paidPlayers, username }) {
@@ -1514,6 +1700,7 @@ export default function App() {
               {key:"pronos",    label:"Pronos"},
               {key:"compare",   label:"Comparer"},
               {key:"classement",label:"Classement"},
+              {key:"stats",     label:"📊 Stats"},
               {key:"cagnotte",  label:"💰 Cagnotte"},
             ].map(t=>(
               <button key={t.key} className={`tab${activeTab===t.key?" active":""}`} onClick={()=>setActiveTab(t.key)}>
@@ -1542,6 +1729,11 @@ export default function App() {
             <ClassementTab players={players} allPreds={allPreds} allJokers={allJokers}
               allWinnerPreds={allWinnerPreds} officialScores={officialScores}
               settings={settings} allMatches={allMatches}
+            />
+          )}
+          {activeTab==="stats"&&(
+            <StatistiquesTab players={players} allPreds={allPreds} allJokers={allJokers}
+              officialScores={officialScores} settings={settings} allMatches={allMatches}
             />
           )}
           {activeTab==="cagnotte"&&(
