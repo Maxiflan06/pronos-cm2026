@@ -133,7 +133,13 @@ const fmtDate  = iso => {
   return d.toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short",timeZone:"Europe/Paris"})
     +" · "+d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit",timeZone:"Europe/Paris"});
 };
-const norm = s => (s||"").replace(/^\S+\s*/,"").toLowerCase().trim();
+// Normalise une chaîne pour comparaison : retire l'emoji de drapeau si présent
+// "🇪🇸 Espagne" → "espagne" | "Espagne" → "espagne" | "" → ""
+const norm = s => {
+  const str = (s||"").trim();
+  const spaceIdx = str.indexOf(" ");
+  return (spaceIdx > 0 ? str.slice(spaceIdx+1) : str).toLowerCase().trim();
+};
 // Compatibilité ascendante : ancien format = string, nouveau = {matchId: true}
 const normalizeJokers = val => {
   if (!val) return [];
